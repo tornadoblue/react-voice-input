@@ -1,4 +1,4 @@
-import { VoiceInputCapture } from "@/components/VoiceInputCapture"; // Corrected import path
+import VoiceInputCapture from "@/components/VoiceInputCapture"; // Corrected to default import
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,12 +13,12 @@ interface Recording {
 }
 
 const LOCAL_STORAGE_KEY = "voiceRecordings";
-const SILENCE_TIMEOUT_MS = 3000; // 3 seconds for pause detection
-const INITIAL_SPEECH_TIMEOUT_MS = 5000; // 5 seconds to wait for initial speech
+const SILENCE_TIMEOUT_MS = 3000; 
+const INITIAL_SPEECH_TIMEOUT_MS = 5000; 
 
 const Index = () => {
   const [recordings, setRecordings] = useState<Recording[]>([]);
-  const [captureKey, setCaptureKey] = useState<number>(0); // Used to reset VoiceInputCapture
+  const [captureKey, setCaptureKey] = useState<number>(0); 
 
   useEffect(() => {
     try {
@@ -45,35 +45,20 @@ const Index = () => {
     const newRecording: Recording = {
       id: crypto.randomUUID(),
       text: finalText,
-      audioUrl: audioUrl || null, // audioUrl is already an object URL from VIC
+      audioUrl: audioUrl || null, 
       timestamp: Date.now(),
     };
-    setRecordings(prevRecordings => [newRecording, ...prevRecordings]); // Add to the beginning for chronological order
+    setRecordings(prevRecordings => [newRecording, ...prevRecordings]); 
     toast.success("Recording added!");
-    setCaptureKey(prevKey => prevKey + 1); // Reset VoiceInputCapture for a fresh state
+    setCaptureKey(prevKey => prevKey + 1); 
   };
 
   const handleDeleteRecording = (idToDelete: string) => {
-    const recToDelete = recordings.find(r => r.id === idToDelete);
-    if (recToDelete?.audioUrl) {
-      // Object URLs are managed by VoiceInputCapture's cleanup or when a new one is created for the same instance.
-      // However, if we delete the entry here, and that URL is not used by an active VIC instance,
-      // it's good practice to revoke it if we are sure it's no longer needed.
-      // For simplicity, we'll assume VIC handles its current URL, and Index handles stored ones.
-      // URL.revokeObjectURL(recToDelete.audioUrl); // This might be problematic if VIC is still using it.
-      // Let's rely on VIC's internal cleanup for its *current* audio.
-      // The URLs stored in `recordings` are for playback and should be valid.
-    }
     setRecordings(prev => prev.filter(rec => rec.id !== idToDelete));
     toast.info("Recording deleted.");
   };
 
   const handleResetAll = () => {
-    // For URLs stored in the recordings list that are object URLs, they should ideally be revoked
-    // if they are not being actively used. However, since they are for playback,
-    // they should remain valid as long as the recording entry exists.
-    // When clearing all, we can iterate and revoke, but this assumes they are all object URLs
-    // and not remote URLs if the app were to change.
     recordings.forEach(rec => { 
       if (rec.audioUrl && rec.audioUrl.startsWith("blob:")) {
         URL.revokeObjectURL(rec.audioUrl); 
@@ -103,7 +88,7 @@ const Index = () => {
         </CardHeader>
         <CardContent>
           <VoiceInputCapture
-            key={captureKey} // Changing key will re-mount the component
+            key={captureKey} 
             onSave={handleSaveNewRecording}
             initialText="" 
             placeholder="Start speaking or type your entry..."
@@ -126,7 +111,6 @@ const Index = () => {
           </CardHeader>
           <CardContent>
             <ul className="space-y-4">
-              {/* Recordings are already added to the beginning, so no need to sort again unless timestamp is edited */}
               {recordings.map((rec) => (
                 <li key={rec.id} className="p-3 border rounded-md shadow-sm bg-background">
                   <p className="text-sm text-muted-foreground mb-1">

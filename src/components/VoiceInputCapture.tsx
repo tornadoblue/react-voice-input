@@ -7,12 +7,9 @@ import EnhancedSpeechRecorder from '@/services/EnhancedSpeechRecorder';
 import { VoiceInputCaptureProps, RecordingState } from '@/types';
 import { cn } from '@/lib/utils';
 import { toast } from "sonner";
-// Renamed findLastSilenceStartTime to findLastSoundEndTime
 import { decodeAudioBlob, findLastSoundEndTime, trimAudioBuffer, audioBufferToWavBlob } from '@/utils/audioUtils';
 
 const STOP_COMMAND = "stop recording";
-// Minimum duration of silence at the end of the recording to consider for trimming off.
-// This should be longer than typical pauses between words but short enough to catch trailing silence after a command.
 const MIN_TRAILING_SILENCE_FOR_TRIM_S = 0.75; 
 
 const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: number; initialSpeechTimeout?: number }> = ({
@@ -88,14 +85,12 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
 
         const decodedInfo = await decodeAudioBlob(audioBlob);
         if (decodedInfo) {
-          // Try to find the end of actual speech before any significant trailing silence
           const soundEndTime = findLastSoundEndTime(decodedInfo.audioBuffer, MIN_TRAILING_SILENCE_FOR_TRIM_S); 
           
-          // Check if soundEndTime is meaningfully different from original duration
-          if (soundEndTime < decodedInfo.duration - (MIN_TRAILING_SILENCE_FOR_TRIM_S / 2)) { // Ensure we trim a decent amount
+          if (soundEndTime < decodedInfo.duration - (MIN_TRAILING_SILENCE_FOR_TRIM_S / 2)) {
             console.log(`VIC: Sound before command/trailing silence estimated to end at ${soundEndTime.toFixed(2)}s. Original duration: ${decodedInfo.duration.toFixed(2)}s.`);
             const trimmedBuffer = trimAudioBuffer(decodedInfo.audioBuffer, soundEndTime);
-            if (trimmedBuffer && trimmedBuffer !== decodedInfo.audioBuffer) { // Check if trimming actually happened
+            if (trimmedBuffer && trimmedBuffer !== decodedInfo.audioBuffer) {
               const trimmedWavBlob = audioBufferToWavBlob(trimmedBuffer);
               if (processedAudioUrl) URL.revokeObjectURL(processedAudioUrl); 
               processedAudioBlob = trimmedWavBlob;
@@ -105,7 +100,7 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
             } else if (trimmedBuffer === decodedInfo.audioBuffer) {
               toast.info("Audio trim resulted in no change, using original audio.");
               console.log("VIC: Trimming resulted in no change or was invalid, using original audio.");
-            } else { // trimmedBuffer is null
+            } else { 
               toast.warn("Audio trimming failed, using original audio.");
               console.log("VIC: trimAudioBuffer returned null.");
             }
@@ -133,7 +128,7 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
     accumulatedFinalTranscriptRef.current = "";
   }, [onSave]);
 
-  const handleError = useCallback((error: string) => { /* ... same ... */ 
+  const handleError = useCallback((error: string) => { 
     console.error(`VIC: handleError. Error: ${error}`);
     setRecordingState("error");
     setInterimTranscript("");
@@ -141,13 +136,13 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
     toast.error(error || "An unknown recording error occurred.", { duration: 5000 });
     accumulatedFinalTranscriptRef.current = "";
   }, []);
-  const handleAudioData = useCallback((dataArray: Uint8Array) => { /* ... same ... */ 
+  const handleAudioData = useCallback((dataArray: Uint8Array) => { 
     if (showWaveform) {
       setAudioDataForWaveform(new Uint8Array(dataArray));
     }
   }, [showWaveform]);
 
-  useEffect(() => { /* ... same ... */ 
+  useEffect(() => { 
     console.log("VIC: useEffect for EnhancedSpeechRecorder setup. Silence:", silenceTimeout, "Initial:", initialSpeechTimeout);
     speechRecorderRef.current = new EnhancedSpeechRecorder({
       onFinalTranscript: handleFinalTranscriptSegment,
@@ -165,20 +160,20 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
     };
   }, [handleFinalTranscriptSegment, handleInterimTranscript, handleRecordingStart, handleRecordingStop, handleError, handleAudioData, silenceTimeout, initialSpeechTimeout]);
   
-  useEffect(() => { /* ... same ... */ 
+  useEffect(() => { 
     if (recordingStateRef.current !== 'recording' && recordingStateRef.current !== 'listening') {
       if (initialText !== finalTranscript) {
         setFinalTranscript(initialText);
       }
     }
   }, [initialText, finalTranscript]);
-  useEffect(() => { /* ... same ... */ 
+  useEffect(() => { 
     const urlToRevoke = currentAudioUrl;
     return () => {
       if (urlToRevoke) URL.revokeObjectURL(urlToRevoke);
     };
   }, [currentAudioUrl]);
-  const toggleRecording = async () => { /* ... same ... */ 
+  const toggleRecording = async () => { 
     console.log(`VIC: toggleRecording. Current state: ${recordingStateRef.current}`);
     if (disabled) return;
 
@@ -190,21 +185,21 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
       await speechRecorderRef.current?.startRecording();
     }
   };
-  const handleTextDisplaySave = (newText: string) => { /* ... same ... */ 
+  const handleTextDisplaySave = (newText: string) => { 
     setFinalTranscript(newText); 
     onSave(newText, currentAudioBlob, currentAudioUrl); 
     toast.success("Text saved manually!");
   };
-  const handleRetryError = () => { /* ... same ... */ 
+  const handleRetryError = () => { 
     setErrorDetails(null);
     setRecordingState("idle");
   };
-  const getButtonIcon = () => { /* ... same ... */ 
+  const getButtonIcon = () => { 
     if (recordingState === "error") return <RotateCcw className="w-5 h-5" />;
     if (recordingState === "recording" || recordingState === "listening") return <StopCircle className="w-5 h-5 text-red-500" />;
     return <Mic className="w-5 h-5" />;
   };
-  const getButtonText = () => { /* ... same ... */ 
+  const getButtonText = () => { 
     if (recordingState === "error") return "Retry";
     if (recordingState === "recording") return "Stop Recording";
     if (recordingState === "listening") return "Listening...";
@@ -212,7 +207,7 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
   };
   const isRecordingOrListening = recordingState === "recording" || recordingState === "listening";
 
-  return ( /* ... JSX same ... */ 
+  return ( 
     <div className={cn("p-3 sm:p-4 border rounded-lg shadow-sm bg-card w-full max-w-2xl mx-auto space-y-3", { "opacity-75 cursor-not-allowed": disabled })}>
       <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
         <Button 
@@ -253,4 +248,4 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
   );
 };
 
-export default VoiceInputCapture;
+export default VoiceInputCapture; {/* ENSURE THIS IS A DEFAULT EXPORT */}
