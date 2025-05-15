@@ -8,6 +8,8 @@ import { VoiceInputCaptureProps, RecordingState } from '@/types';
 import { cn } from '@/lib/utils';
 import { toast } from "sonner";
 
+const STOP_COMMAND = "stop recording";
+
 const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: number; initialSpeechTimeout?: number }> = ({
   onSave,
   initialText = "",
@@ -21,14 +23,14 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
 }) => {
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [interimTranscript, setInterimTranscript] = useState<string>("");
-  const [finalTranscript, setFinalTranscript] = useState<string>(initialText); // Text in the editor
+  const [finalTranscript, setFinalTranscript] = useState<string>(initialText);
   const [audioDataForWaveform, setAudioDataForWaveform] = useState<Uint8Array | null>(null);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [currentAudioBlob, setCurrentAudioBlob] = useState<Blob | null>(null);
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
   
   const speechRecorderRef = useRef<EnhancedSpeechRecorder | null>(null);
-  const accumulatedFinalTranscriptRef = useRef<string>(""); // Re-introduced for reliable accumulation
+  const accumulatedFinalTranscriptRef = useRef<string>("");
 
   const recordingStateRef = useRef(recordingState);
   useEffect(() => {
@@ -38,16 +40,20 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
   const handleFinalTranscriptSegment = useCallback((segment: string) => {
     console.log("VIC: Final segment received:", segment);
     if (segment) {
-      // Append to the ref
       accumulatedFinalTranscriptRef.current = (accumulatedFinalTranscriptRef.current.trim() + " " + segment.trim()).trim();
       console.log("VIC: accumulatedFinalTranscriptRef.current is now:", accumulatedFinalTranscriptRef.current);
       
-      // Update the displayed text (finalTranscript state) if recording
       if (recordingStateRef.current === "recording") {
         setFinalTranscript(accumulatedFinalTranscriptRef.current);
+        // Check for stop command at the end of the accumulated transcript
+        if (accumulatedFinalTranscriptRef.current.toLowerCase().endsWith(STOP_COMMAND)) {
+          console.log("VIC: Potential stop command detected in final segment stream.");
+          // The silence timer in EnhancedSpeechRecorder should naturally stop the recording soon after this.
+          // We don't stop it immediately here to allow the audio for "stop recording" to be captured.
+        }
       }
     }
-  }, []); // Stable
+  }, []);
 
   const handleInterimTranscript = useCallback((transcript: string) => {
     if (showInterimTranscript) {
@@ -60,8 +66,8 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
     setRecordingState("recording");
     setErrorDetails(null);
     setInterimTranscript("");
-    accumulatedFinalTranscriptRef.current = ""; // Clear accumulator
-    setFinalTranscript(""); // Clear editor for new recording session
+    accumulatedFinalTranscriptRef.current = "";
+    setFinalTranscript("");
     
     setCurrentAudioBlob(null);
     setCurrentAudioUrl(prevUrl => {
@@ -71,32 +77,43 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
   }, []); 
 
   const handleRecordingStop = useCallback((audioBlob: Blob | null, audioUrl: string | null) => {
-    // Use the accumulated text from the ref as the primary source from the speech session
-    const textFromSpeechSession = accumulatedFinalTranscriptRef.current.trim();
-    console.log(`VIC: handleRecordingStop. Text from speech session: "${textFromSpeechSession}"`);
+    let textFromSpeechSession = accumulatedFinalTranscriptRef.current.trim();
+    console.log(`VIC: handleRecordingStop. Text from speech session before command check: "${textFromSpeechSession}"`);
     
     setRecordingState("idle");
     setInterimTranscript("");
-    
-    // finalTranscript state should already reflect textFromSpeechSession due to live updates
-    // but we use textFromSpeechSession to be certain about what was captured during this recording.
-    // If user manually edited finalTranscript, that's a separate concern handled by EditableTextDisplay's onSave.
-    
     setCurrentAudioBlob(audioBlob);
     setCurrentAudioUrl(audioUrl);
 
+    let commandDetected = false;
+    if (textFromSpeechSession.toLowerCase().endsWith(STOP_COMMAND)) {
+      // Check if the command is the *only* thing, or if it's preceded by a space (likely end of sentence)
+      const commandIndex = textFromSpeechSession.toLowerCase().lastIndexOf(STOP_COMMAND);
+      if (commandIndex === 0 || (commandIndex > 0 && textFromSpeechSession[commandIndex - 1] === ' ')) {
+        console.log("VIC: 'stop recording' command confirmed at the end of transcript.");
+        textFromSpeechSession = textFromSpeechSession.substring(0, commandIndex).trim();
+        commandDetected = true;
+      }
+    }
+    
+    // Update finalTranscript state with the (potentially trimmed) text
+    setFinalTranscript(textFromSpeechSession);
+
     if (textFromSpeechSession) { 
       console.log("VIC: Calling onSave with text:", textFromSpeechSession);
-      // Ensure finalTranscript state is also set to this, in case it wasn't perfectly synced
-      setFinalTranscript(textFromSpeechSession); 
       onSave(textFromSpeechSession, audioBlob, audioUrl);
     } else {
-      console.log("VIC: No text detected from speech session to save.");
-      toast.info("No text detected for dictation.");
-      setFinalTranscript(""); // Ensure editor is clear if nothing was saved
+      if (commandDetected) { // If command was detected and resulted in empty string
+        toast.info("'Stop recording' command received."); 
+        // Optionally, still call onSave if you want to save an empty entry for a command-stop
+        // onSave("", audioBlob, audioUrl); // If you want to save audio even if text is just command
+      } else {
+        toast.info("No text detected for dictation.");
+      }
+      console.log("VIC: No actual text content to save after command processing.");
     }
-    accumulatedFinalTranscriptRef.current = ""; // Reset for next session
-  }, [onSave]); // onSave is the main dependency from props
+    accumulatedFinalTranscriptRef.current = "";
+  }, [onSave]);
 
   const handleError = useCallback((error: string) => {
     console.error(`VIC: handleError. Error: ${error}`);
@@ -104,7 +121,7 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
     setInterimTranscript("");
     setAudioDataForWaveform(null);
     toast.error(error || "An unknown recording error occurred.", { duration: 5000 });
-    accumulatedFinalTranscriptRef.current = ""; // Clear accumulator on error too
+    accumulatedFinalTranscriptRef.current = "";
   }, []);
 
   const handleAudioData = useCallback((dataArray: Uint8Array) => {
@@ -132,7 +149,6 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
   }, [handleFinalTranscriptSegment, handleInterimTranscript, handleRecordingStart, handleRecordingStop, handleError, handleAudioData, silenceTimeout, initialSpeechTimeout]);
   
   useEffect(() => {
-    // Sync with initialText prop if not recording/listening
     if (recordingStateRef.current !== 'recording' && recordingStateRef.current !== 'listening') {
       if (initialText !== finalTranscript) {
         setFinalTranscript(initialText);
@@ -152,6 +168,8 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
     if (disabled) return;
 
     if (recordingStateRef.current === "recording" || recordingStateRef.current === "listening") {
+      // Manually stopping: let the silence timer or natural end of speech handle the "stop recording" command if spoken.
+      // If user clicks stop button, it's a hard stop.
       speechRecorderRef.current?.stopRecording();
     } else {
       setErrorDetails(null);
@@ -161,11 +179,7 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
   };
 
   const handleTextDisplaySave = (newText: string) => {
-    // This is when user manually edits and saves the EditableTextDisplay
     setFinalTranscript(newText); 
-    // If there was a prior recording session's audio, it's still associated here.
-    // If user types something new and saves, it uses the old audio. This might be desired or not.
-    // For now, it preserves the audio from the last recording session.
     onSave(newText, currentAudioBlob, currentAudioUrl); 
     toast.success("Text saved manually!");
   };
