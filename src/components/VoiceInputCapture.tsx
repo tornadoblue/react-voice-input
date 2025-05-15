@@ -10,7 +10,13 @@ import { toast } from "sonner";
 import { decodeAudioBlob, findLastSoundEndTime, trimAudioBuffer, audioBufferToWavBlob } from '@/utils/audioUtils';
 
 const STOP_COMMAND = "stop recording";
-const MIN_TRAILING_SILENCE_FOR_TRIM_S = 0.75; 
+const MIN_TRAILING_SILENCE_FOR_TRIM_S = 0.75;
+
+// Helper function to capitalize the first letter of a string
+const capitalizeFirstLetter = (str: string): string => {
+  if (!str) return "";
+  return str.charAt(0).toUpperCase() + str.slice(1);
+};
 
 const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: number; initialSpeechTimeout?: number }> = ({
   onSave,
@@ -40,11 +46,35 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
   }, [recordingState]);
 
   const handleFinalTranscriptSegment = useCallback((segment: string) => {
-    if (segment) {
-      accumulatedFinalTranscriptRef.current = (accumulatedFinalTranscriptRef.current.trim() + " " + segment.trim()).trim();
-      if (recordingStateRef.current === "recording") {
-        setFinalTranscript(accumulatedFinalTranscriptRef.current);
+    const newSegment = segment.trim();
+    if (!newSegment) return; // Ignore empty segments
+
+    let currentText = accumulatedFinalTranscriptRef.current;
+
+    if (!currentText) {
+      // This is the very first segment of the dictation
+      accumulatedFinalTranscriptRef.current = capitalizeFirstLetter(newSegment);
+    } else {
+      // There's existing text. Check if it needs a period.
+      const lastChar = currentText.slice(-1);
+      const endsWithPunctuation = ['.', '!', '?'].includes(lastChar);
+      const endsWithSpace = currentText.endsWith(" ");
+
+      if (!endsWithPunctuation && !endsWithSpace) {
+        currentText += ". "; // Add period and space
+      } else if (endsWithPunctuation && !endsWithSpace) {
+        currentText += " "; // Add space if punctuation exists but no space
       }
+      // If it ends with space already (e.g. after ". "), no need to add another.
+      
+      accumulatedFinalTranscriptRef.current = currentText + capitalizeFirstLetter(newSegment);
+    }
+    
+    // Ensure no leading/trailing spaces in the final accumulated string for display consistency
+    accumulatedFinalTranscriptRef.current = accumulatedFinalTranscriptRef.current.trim();
+
+    if (recordingStateRef.current === "recording") {
+      setFinalTranscript(accumulatedFinalTranscriptRef.current);
     }
   }, []);
 
@@ -56,8 +86,9 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
     setRecordingState("recording");
     setErrorDetails(null);
     setInterimTranscript("");
-    accumulatedFinalTranscriptRef.current = "";
-    setFinalTranscript("");
+    // Reset accumulated transcript for the new recording session
+    accumulatedFinalTranscriptRef.current = ""; 
+    setFinalTranscript(""); // Clear the display for the new recording
     setCurrentAudioBlob(null);
     setCurrentAudioUrl(prevUrl => {
       if (prevUrl) URL.revokeObjectURL(prevUrl);
@@ -69,6 +100,11 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
     let textFromSpeechSession = accumulatedFinalTranscriptRef.current.trim();
     console.log(`VIC: handleRecordingStop. Text: "${textFromSpeechSession}", Blob: ${!!audioBlob}`);
     
+    // Add a final period if the text doesn't end with one and is not empty
+    if (textFromSpeechSession && !['.', '!', '?'].includes(textFromSpeechSession.slice(-1))) {
+        textFromSpeechSession += ".";
+    }
+
     setRecordingState("idle");
     setInterimTranscript("");
     
@@ -76,10 +112,12 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
     let processedAudioBlob = audioBlob;
     let processedAudioUrl = audioUrl;
 
-    if (textFromSpeechSession.toLowerCase().endsWith(STOP_COMMAND) && audioBlob) {
-      const commandIndex = textFromSpeechSession.toLowerCase().lastIndexOf(STOP_COMMAND);
+    if (textFromSpeechSession.toLowerCase().endsWith(STOP_COMMAND + ".") && audioBlob) { // Check with period
+      const commandTextWithPunc = STOP_COMMAND + ".";
+      const commandIndex = textFromSpeechSession.toLowerCase().lastIndexOf(commandTextWithPunc);
+      
       if (commandIndex === 0 || (commandIndex > 0 && textFromSpeechSession[commandIndex - 1] === ' ')) {
-        console.log("VIC: 'stop recording' command detected in text. Attempting audio trim.");
+        console.log("VIC: 'stop recording.' command detected in text. Attempting audio trim.");
         textFromSpeechSession = textFromSpeechSession.substring(0, commandIndex).trim();
         commandDetected = true;
 
@@ -99,14 +137,11 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
               console.log(`VIC: Audio trimmed. New blob size: ${processedAudioBlob.size}, New URL: ${processedAudioUrl}`);
             } else if (trimmedBuffer === decodedInfo.audioBuffer) {
               toast.info("Audio trim resulted in no change, using original audio.");
-              console.log("VIC: Trimming resulted in no change or was invalid, using original audio.");
             } else { 
               toast.warn("Audio trimming failed, using original audio.");
-              console.log("VIC: trimAudioBuffer returned null.");
             }
           } else {
             toast.info("No significant trailing silence to trim, using original audio.");
-            console.log(`VIC: No significant trailing silence found or soundEndTime (${soundEndTime.toFixed(2)}s) too close to original duration (${decodedInfo.duration.toFixed(2)}s).`);
           }
         } else {
           toast.warn("Audio decoding failed for trimming, using original audio.");
@@ -118,14 +153,14 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
     setCurrentAudioBlob(processedAudioBlob);
     setCurrentAudioUrl(processedAudioUrl);
 
-    if (textFromSpeechSession) { 
+    if (textFromSpeechSession || processedAudioBlob) { // Save if there's text OR an audio blob
       onSave(textFromSpeechSession, processedAudioBlob, processedAudioUrl);
     } else {
-      if (commandDetected) toast.info("'Stop recording' command processed.");
-      else toast.info("No text detected for dictation.");
+      if (commandDetected) toast.info("'Stop recording' command processed, no other content.");
+      else toast.info("No text or audio detected for dictation.");
       setFinalTranscript(""); 
     }
-    accumulatedFinalTranscriptRef.current = "";
+    // accumulatedFinalTranscriptRef.current = ""; // Already reset in handleRecordingStart for next session
   }, [onSave]);
 
   const handleError = useCallback((error: string) => { 
@@ -248,4 +283,4 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
   );
 };
 
-export default VoiceInputCapture; {/* ENSURE THIS IS A DEFAULT EXPORT */}
+export default VoiceInputCapture;
