@@ -1,4 +1,4 @@
-import { VoiceInputCapture } from "@/index";
+import { VoiceInputCapture } from "@/components/VoiceInputCapture"; // Corrected import path
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
