@@ -7,7 +7,7 @@ import EnhancedSpeechRecorder from '@/services/EnhancedSpeechRecorder';
 import { VoiceInputCaptureProps, RecordingState } from '@/types';
 import { cn } from '@/lib/utils';
 import { toast } from "sonner";
-import { decodeAudioBlob, findLastSilenceStartTime } from '@/utils/audioUtils'; // Import new utils
+import { decodeAudioBlob, findLastSilenceStartTime, trimAudioBuffer, audioBufferToWavBlob } from '@/utils/audioUtils';
 
 const STOP_COMMAND = "stop recording";
 
@@ -39,10 +39,8 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
   }, [recordingState]);
 
   const handleFinalTranscriptSegment = useCallback((segment: string) => {
-    // console.log("VIC: Final segment received:", segment);
     if (segment) {
       accumulatedFinalTranscriptRef.current = (accumulatedFinalTranscriptRef.current.trim() + " " + segment.trim()).trim();
-      // console.log("VIC: accumulatedFinalTranscriptRef.current is now:", accumulatedFinalTranscriptRef.current);
       if (recordingStateRef.current === "recording") {
         setFinalTranscript(accumulatedFinalTranscriptRef.current);
       }
@@ -54,7 +52,6 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
   }, [showInterimTranscript]);
 
   const handleRecordingStart = useCallback(() => {
-    // console.log("VIC: handleRecordingStart - Setting state to 'recording'.");
     setRecordingState("recording");
     setErrorDetails(null);
     setInterimTranscript("");
@@ -69,69 +66,66 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
 
   const handleRecordingStop = useCallback(async (audioBlob: Blob | null, audioUrl: string | null) => {
     let textFromSpeechSession = accumulatedFinalTranscriptRef.current.trim();
-    console.log(`VIC: handleRecordingStop. Text from speech session: "${textFromSpeechSession}"`);
+    console.log(`VIC: handleRecordingStop. Text: "${textFromSpeechSession}", Blob: ${!!audioBlob}`);
     
     setRecordingState("idle");
     setInterimTranscript("");
     
     let commandDetected = false;
-    let finalAudioBlob = audioBlob; // Use a new variable for potentially trimmed blob
-    let finalAudioUrl = audioUrl;   // And new URL
+    let processedAudioBlob = audioBlob;
+    let processedAudioUrl = audioUrl;
 
-    if (textFromSpeechSession.toLowerCase().endsWith(STOP_COMMAND)) {
+    if (textFromSpeechSession.toLowerCase().endsWith(STOP_COMMAND) && audioBlob) {
       const commandIndex = textFromSpeechSession.toLowerCase().lastIndexOf(STOP_COMMAND);
       if (commandIndex === 0 || (commandIndex > 0 && textFromSpeechSession[commandIndex - 1] === ' ')) {
-        console.log("VIC: 'stop recording' command detected in text.");
+        console.log("VIC: 'stop recording' command detected. Attempting audio trim.");
         textFromSpeechSession = textFromSpeechSession.substring(0, commandIndex).trim();
         commandDetected = true;
 
-        if (audioBlob) {
-          console.log("VIC: Attempting to analyze audio for command trimming...");
-          const decodedInfo = await decodeAudioBlob(audioBlob);
-          if (decodedInfo) {
-            console.log(`VIC: Audio decoded. Duration: ${decodedInfo.duration.toFixed(2)}s`);
-            // For "stop recording", we want to find silence *before* the command.
-            // This is complex. For now, let's just log the end silence.
-            // A more robust approach would be to estimate command duration and look for silence before that.
-            const silenceStartTime = findLastSilenceStartTime(decodedInfo.audioBuffer, 0.5, 0.01, 0.05); // Shorter silence for command context
-            if (silenceStartTime !== null) {
-              console.log(`VIC: Last significant silence in audio starts at ${silenceStartTime.toFixed(2)}s. Original duration: ${decodedInfo.duration.toFixed(2)}s.`);
-              // TODO: Actual trimming logic would go here.
-              // For now, we are NOT trimming the audioBlob.
-              // finalAudioBlob = createTrimmedBlob(decodedInfo.audioBuffer, 0, silenceStartTime);
-              // if (finalAudioUrl) URL.revokeObjectURL(finalAudioUrl);
-              // finalAudioUrl = URL.createObjectURL(finalAudioBlob);
-              toast.info("Audio analysis for 'stop recording' command (logging only).");
+        const decodedInfo = await decodeAudioBlob(audioBlob);
+        if (decodedInfo) {
+          // Use a slightly longer minSilenceDuration to ensure we capture the pause *before* the command.
+          // The 0.5s was for detecting the silence *after* the command.
+          const soundEndTime = findLastSilenceStartTime(decodedInfo.audioBuffer, 0.75, 0.01, 0.1); 
+          
+          if (soundEndTime !== null && soundEndTime > 0 && soundEndTime < decodedInfo.duration) {
+            console.log(`VIC: Sound before command estimated to end at ${soundEndTime.toFixed(2)}s. Original duration: ${decodedInfo.duration.toFixed(2)}s.`);
+            const trimmedBuffer = trimAudioBuffer(decodedInfo.audioBuffer, soundEndTime);
+            if (trimmedBuffer) {
+              const trimmedWavBlob = audioBufferToWavBlob(trimmedBuffer);
+              if (processedAudioUrl) URL.revokeObjectURL(processedAudioUrl); // Revoke old URL
+              processedAudioBlob = trimmedWavBlob;
+              processedAudioUrl = URL.createObjectURL(trimmedWavBlob);
+              toast.success("Audio trimmed for 'stop recording' command.");
+              console.log(`VIC: Audio trimmed. New blob size: ${processedAudioBlob.size}, New URL: ${processedAudioUrl}`);
             } else {
-              console.log("VIC: Could not find suitable silence point for command audio trimming.");
+              toast.warn("Audio trimming failed, using original audio.");
             }
           } else {
-            console.warn("VIC: Could not decode audio for command analysis.");
+            toast.warn("Could not determine trim point, using original audio.");
+            console.log("VIC: Could not find suitable silence point for trimming or soundEndTime was invalid.");
           }
+        } else {
+          toast.warn("Audio decoding failed for trimming, using original audio.");
         }
       }
     }
     
-    setFinalTranscript(textFromSpeechSession); // Update editor with potentially trimmed text
-    setCurrentAudioBlob(finalAudioBlob); // Store the (currently untrimmed) blob
-    setCurrentAudioUrl(finalAudioUrl);   // And its URL
+    setFinalTranscript(textFromSpeechSession);
+    setCurrentAudioBlob(processedAudioBlob);
+    setCurrentAudioUrl(processedAudioUrl);
 
     if (textFromSpeechSession) { 
-      console.log("VIC: Calling onSave with text:", textFromSpeechSession);
-      onSave(textFromSpeechSession, finalAudioBlob, finalAudioUrl);
+      onSave(textFromSpeechSession, processedAudioBlob, processedAudioUrl);
     } else {
-      if (commandDetected) {
-        toast.info("'Stop recording' command processed.");
-      } else {
-        toast.info("No text detected for dictation.");
-      }
+      if (commandDetected) toast.info("'Stop recording' command processed.");
+      else toast.info("No text detected for dictation.");
       setFinalTranscript(""); 
     }
     accumulatedFinalTranscriptRef.current = "";
   }, [onSave]);
 
-  const handleError = useCallback((error: string) => {
-    // ... (same as before)
+  const handleError = useCallback((error: string) => { /* ... same ... */ 
     console.error(`VIC: handleError. Error: ${error}`);
     setRecordingState("error");
     setInterimTranscript("");
@@ -139,16 +133,13 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
     toast.error(error || "An unknown recording error occurred.", { duration: 5000 });
     accumulatedFinalTranscriptRef.current = "";
   }, []);
-
-  const handleAudioData = useCallback((dataArray: Uint8Array) => {
-    // ... (same as before)
+  const handleAudioData = useCallback((dataArray: Uint8Array) => { /* ... same ... */ 
     if (showWaveform) {
       setAudioDataForWaveform(new Uint8Array(dataArray));
     }
   }, [showWaveform]);
 
-  useEffect(() => {
-    // ... (same as before, ensure initialSpeechTimeout is passed)
+  useEffect(() => { /* ... same ... */ 
     console.log("VIC: useEffect for EnhancedSpeechRecorder setup. Silence:", silenceTimeout, "Initial:", initialSpeechTimeout);
     speechRecorderRef.current = new EnhancedSpeechRecorder({
       onFinalTranscript: handleFinalTranscriptSegment,
@@ -166,25 +157,20 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
     };
   }, [handleFinalTranscriptSegment, handleInterimTranscript, handleRecordingStart, handleRecordingStop, handleError, handleAudioData, silenceTimeout, initialSpeechTimeout]);
   
-  useEffect(() => {
-    // ... (same as before)
+  useEffect(() => { /* ... same ... */ 
     if (recordingStateRef.current !== 'recording' && recordingStateRef.current !== 'listening') {
       if (initialText !== finalTranscript) {
         setFinalTranscript(initialText);
       }
     }
   }, [initialText, finalTranscript]);
-
-  useEffect(() => {
-    // ... (same as before)
+  useEffect(() => { /* ... same ... */ 
     const urlToRevoke = currentAudioUrl;
     return () => {
       if (urlToRevoke) URL.revokeObjectURL(urlToRevoke);
     };
   }, [currentAudioUrl]);
-
-  const toggleRecording = async () => {
-    // ... (same as before)
+  const toggleRecording = async () => { /* ... same ... */ 
     console.log(`VIC: toggleRecording. Current state: ${recordingStateRef.current}`);
     if (disabled) return;
 
@@ -196,20 +182,15 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
       await speechRecorderRef.current?.startRecording();
     }
   };
-
-  const handleTextDisplaySave = (newText: string) => {
-    // ... (same as before)
+  const handleTextDisplaySave = (newText: string) => { /* ... same ... */ 
     setFinalTranscript(newText); 
     onSave(newText, currentAudioBlob, currentAudioUrl); 
     toast.success("Text saved manually!");
   };
-
-  const handleRetryError = () => {
-    // ... (same as before)
+  const handleRetryError = () => { /* ... same ... */ 
     setErrorDetails(null);
     setRecordingState("idle");
   };
-  
   const getButtonIcon = () => { /* ... same ... */ 
     if (recordingState === "error") return <RotateCcw className="w-5 h-5" />;
     if (recordingState === "recording" || recordingState === "listening") return <StopCircle className="w-5 h-5 text-red-500" />;
