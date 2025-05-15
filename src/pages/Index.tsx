@@ -13,73 +13,59 @@ interface Recording {
 }
 
 const LOCAL_STORAGE_KEY = "voiceRecordings";
+const SILENCE_TIMEOUT_MS = 3000; // 3 seconds for pause detection
+const INITIAL_SPEECH_TIMEOUT_MS = 5000; // 5 seconds to wait for initial speech
 
 const Index = () => {
   const [recordings, setRecordings] = useState<Recording[]>([]);
-  const [captureKey, setCaptureKey] = useState<number>(0); // Used to re-mount VoiceInputCapture
+  const [captureKey, setCaptureKey] = useState<number>(0);
 
-  // Load recordings from local storage on initial mount
   useEffect(() => {
     try {
       const storedRecordings = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (storedRecordings) {
-        setRecordings(JSON.parse(storedRecordings));
-      }
-    } catch (error) {
-      console.error("Failed to load recordings from local storage:", error);
-      toast.error("Could not load saved recordings.");
-    }
+      if (storedRecordings) setRecordings(JSON.parse(storedRecordings));
+    } catch (error) { console.error("Failed to load recordings:", error); toast.error("Could not load recordings."); }
   }, []);
 
-  // Save recordings to local storage whenever they change
   useEffect(() => {
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(recordings));
-    } catch (error) {
-      console.error("Failed to save recordings to local storage:", error);
-      toast.error("Could not save recordings.");
-    }
+    } catch (error) { console.error("Failed to save recordings:", error); toast.error("Could not save recordings."); }
   }, [recordings]);
 
   const handleSaveNewRecording = (finalText: string, audioBlob?: Blob, audioUrl?: string) => {
-    console.log("New recording text:", finalText);
+    console.log("Index: Saving new recording. Text:", finalText);
+    // VoiceInputCapture now handles the "no text detected" toast and doesn't call onSave if text is empty.
+    // So, if this function is called, we assume finalText is valid or audioBlob exists.
+    if (!finalText.trim() && !audioBlob) { 
+      console.log("Index: Attempted to save empty recording (no text, no audio) - this should be rare now. Skipping.");
+      setCaptureKey(prevKey => prevKey + 1); // Reset VIC even if parent decides not to save
+      return;
+    }
+
     const newRecording: Recording = {
-      id: crypto.randomUUID(), // Modern way to generate unique IDs
+      id: crypto.randomUUID(),
       text: finalText,
-      audioUrl: audioUrl || null, // audioUrl is already a blob URL from VoiceInputCapture
+      audioUrl: audioUrl || null,
       timestamp: Date.now(),
     };
-
     setRecordings(prevRecordings => [...prevRecordings, newRecording]);
-    
-    // Revoke object URL from previous VoiceInputCapture instance if it existed and wasn't used for a recording
-    // This is tricky because the audioUrl in VoiceInputCapture is internal.
-    // The current audioUrl from onSave is the one we care about.
-    // We don't need to manage VoiceInputCapture's internal blob URLs here, it should manage its own.
-
     toast.success("Recording added!");
-    setCaptureKey(prevKey => prevKey + 1); // Re-mount VoiceInputCapture to reset it
+    setCaptureKey(prevKey => prevKey + 1);
   };
 
   const handleDeleteRecording = (idToDelete: string) => {
-    const recordingToDelete = recordings.find(r => r.id === idToDelete);
-    if (recordingToDelete && recordingToDelete.audioUrl) {
-      URL.revokeObjectURL(recordingToDelete.audioUrl); // Clean up blob URL
-    }
-    setRecordings(prevRecordings => prevRecordings.filter(rec => rec.id !== idToDelete));
+    const recToDelete = recordings.find(r => r.id === idToDelete);
+    if (recToDelete?.audioUrl) URL.revokeObjectURL(recToDelete.audioUrl);
+    setRecordings(prev => prev.filter(rec => rec.id !== idToDelete));
     toast.info("Recording deleted.");
   };
 
   const handleResetAll = () => {
-    // Revoke all existing blob URLs before clearing
-    recordings.forEach(rec => {
-      if (rec.audioUrl) {
-        URL.revokeObjectURL(rec.audioUrl);
-      }
-    });
+    recordings.forEach(rec => { if (rec.audioUrl) URL.revokeObjectURL(rec.audioUrl); });
     setRecordings([]);
-    localStorage.removeItem(LOCAL_STORAGE_KEY); // Clear local storage
-    setCaptureKey(prevKey => prevKey + 1); // Re-mount VoiceInputCapture
+    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    setCaptureKey(prevKey => prevKey + 1);
     toast.info("All recordings cleared.");
   };
 
@@ -88,7 +74,7 @@ const Index = () => {
       <header className="text-center">
         <h1 className="text-2xl sm:text-3xl font-bold mb-2">Voice Journal</h1>
         <p className="text-muted-foreground text-sm sm:text-base">
-          Record your thoughts. Each recording will be added to the list below.
+          Record your thoughts. Pauses or "stop recording" will save the entry.
         </p>
       </header>
 
@@ -103,8 +89,10 @@ const Index = () => {
           <VoiceInputCapture
             key={captureKey}
             onSave={handleSaveNewRecording}
-            initialText="" // Always start fresh for a new recording
+            initialText="" 
             placeholder="Start speaking or type your entry..."
+            silenceTimeout={SILENCE_TIMEOUT_MS}
+            initialSpeechTimeout={INITIAL_SPEECH_TIMEOUT_MS}
           />
         </CardContent>
       </Card>
@@ -117,7 +105,7 @@ const Index = () => {
           </CardHeader>
           <CardContent>
             <ul className="space-y-4">
-              {recordings.sort((a,b) => b.timestamp - a.timestamp) // Display newest first
+              {recordings.sort((a,b) => b.timestamp - a.timestamp)
                 .map((rec) => (
                 <li key={rec.id} className="p-3 border rounded-md shadow-sm bg-background">
                   <p className="text-sm text-muted-foreground mb-1">
