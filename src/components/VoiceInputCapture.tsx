@@ -17,102 +17,92 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
   placeholder = "Speak or type here...",
   disabled = false,
   silenceTimeout,
-  initialSpeechTimeout, // New prop
+  initialSpeechTimeout,
 }) => {
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [interimTranscript, setInterimTranscript] = useState<string>("");
-  const [finalTranscript, setFinalTranscript] = useState<string>(initialText);
+  const [finalTranscript, setFinalTranscript] = useState<string>(initialText); // Text in the editor
   const [audioDataForWaveform, setAudioDataForWaveform] = useState<Uint8Array | null>(null);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [currentAudioBlob, setCurrentAudioBlob] = useState<Blob | null>(null);
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
   
   const speechRecorderRef = useRef<EnhancedSpeechRecorder | null>(null);
-  const accumulatedFinalTranscriptRef = useRef<string>("");
+  
+  // Ref to hold the latest recordingState for stable callbacks
   const recordingStateRef = useRef(recordingState);
-
   useEffect(() => {
     recordingStateRef.current = recordingState;
   }, [recordingState]);
 
   const handleFinalTranscriptSegment = useCallback((segment: string) => {
-    console.log("VIC: Final segment:", segment);
+    console.log("VIC: Final segment received:", segment);
     if (segment) {
-      accumulatedFinalTranscriptRef.current = (accumulatedFinalTranscriptRef.current.trim() + " " + segment.trim()).trim();
-      // Live update the editor only if recording
+      // If actively recording, update the editor's content (finalTranscript state)
+      // by appending the new segment to what's already there.
       if (recordingStateRef.current === "recording") {
-        setFinalTranscript(prev => (prev.trim() + " " + segment.trim()).trim());
+        setFinalTranscript(prevEditorText => (prevEditorText.trim() + " " + segment.trim()).trim());
       }
     }
-  }, []);
+  }, []); // Stable: empty dependency array, uses ref for recordingState
 
   const handleInterimTranscript = useCallback((transcript: string) => {
-    if (showInterimTranscript) setInterimTranscript(transcript);
+    if (showInterimTranscript) {
+      setInterimTranscript(transcript);
+    }
   }, [showInterimTranscript]);
 
   const handleRecordingStart = useCallback(() => {
-    console.log("VIC: Recording actually started (onstart event).");
+    console.log("VIC: handleRecordingStart - Setting state to 'recording'.");
     setRecordingState("recording");
     setErrorDetails(null);
     setInterimTranscript("");
-    accumulatedFinalTranscriptRef.current = ""; 
-    setFinalTranscript(""); // Clear editor for new recording
+    setFinalTranscript(""); // Clear editor for new recording session
+    
     setCurrentAudioBlob(null);
+    // Revoke previous URL if it exists
     setCurrentAudioUrl(prevUrl => {
       if (prevUrl) URL.revokeObjectURL(prevUrl);
       return null;
     });
-  }, []);
+  }, []); 
 
   const handleRecordingStop = useCallback((audioBlob: Blob | null, audioUrl: string | null) => {
-    console.log(`VIC: Recording stopped. Accumulated: "${accumulatedFinalTranscriptRef.current}". Blob: ${!!audioBlob}`);
+    console.log(`VIC: handleRecordingStop. Current editor text: "${finalTranscript}"`);
     setRecordingState("idle");
     setInterimTranscript("");
     
-    const textFromSpeech = accumulatedFinalTranscriptRef.current.trim();
-    // finalTranscript might have been edited manually, so we prioritize it if it has content,
-    // otherwise, we use textFromSpeech.
-    let textToSave = finalTranscript.trim();
-    if (!textToSave && textFromSpeech) { // If editor is empty but speech was captured
-        textToSave = textFromSpeech;
-        setFinalTranscript(textToSave); // Update editor to show what was captured
-    } else if (textToSave && textFromSpeech && !textToSave.includes(textFromSpeech)) {
-        // If editor has text and speech has different/additional text, append speech
-        textToSave = (textToSave + " " + textFromSpeech).trim();
-        setFinalTranscript(textToSave);
-    }
-
+    const textToSave = finalTranscript.trim(); // Text from the editor (which was updated live)
 
     setCurrentAudioBlob(audioBlob);
     setCurrentAudioUrl(audioUrl);
 
-    if (textToSave) {
+    if (textToSave) { 
       console.log("VIC: Calling onSave with text:", textToSave);
       onSave(textToSave, audioBlob, audioUrl);
     } else {
       console.log("VIC: No text detected to save.");
       toast.info("No text detected for dictation.");
-      // If onSave is not called, parent won't reset captureKey.
-      // We might want to clear finalTranscript here if no save occurs.
-      setFinalTranscript(""); // Clear editor if nothing was saved
+      setFinalTranscript(""); // Ensure editor is clear if nothing was saved
     }
-    accumulatedFinalTranscriptRef.current = "";
   }, [finalTranscript, onSave]);
 
   const handleError = useCallback((error: string) => {
-    console.error(`VIC: Error: ${error}`);
+    console.error(`VIC: handleError. Error: ${error}`);
     setRecordingState("error");
     setInterimTranscript("");
     setAudioDataForWaveform(null);
-    toast.error(error || "Recording error.", { duration: 5000 });
+    toast.error(error || "An unknown recording error occurred.", { duration: 5000 });
   }, []);
 
   const handleAudioData = useCallback((dataArray: Uint8Array) => {
-    if (showWaveform) setAudioDataForWaveform(new Uint8Array(dataArray));
+    if (showWaveform) {
+      setAudioDataForWaveform(new Uint8Array(dataArray));
+    }
   }, [showWaveform]);
 
   useEffect(() => {
-    console.log("VIC: Initializing/Re-initializing EnhancedSpeechRecorder.");
+    console.log("VIC: useEffect for EnhancedSpeechRecorder setup. Silence:", silenceTimeout, "Initial:", initialSpeechTimeout);
     speechRecorderRef.current = new EnhancedSpeechRecorder({
       onFinalTranscript: handleFinalTranscriptSegment,
       onInterimTranscript: handleInterimTranscript,
@@ -124,58 +114,68 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
       initialSpeechTimeout: initialSpeechTimeout,
     });
     return () => {
-      console.log("VIC: Cleanup: Stopping EnhancedSpeechRecorder.");
+      console.log("VIC: Cleanup useEffect - Stopping recorder.");
       speechRecorderRef.current?.stopRecording();
     };
   }, [handleFinalTranscriptSegment, handleInterimTranscript, handleRecordingStart, handleRecordingStop, handleError, handleAudioData, silenceTimeout, initialSpeechTimeout]);
   
   useEffect(() => {
     if (recordingStateRef.current !== 'recording' && recordingStateRef.current !== 'listening') {
-      if (initialText !== finalTranscript) setFinalTranscript(initialText);
+      if (initialText !== finalTranscript) {
+        setFinalTranscript(initialText);
+      }
     }
   }, [initialText, finalTranscript]);
 
   useEffect(() => {
-    return () => { if (currentAudioUrl) URL.revokeObjectURL(currentAudioUrl); };
+    const urlToRevoke = currentAudioUrl;
+    return () => {
+      if (urlToRevoke) {
+        URL.revokeObjectURL(urlToRevoke);
+      }
+    };
   }, [currentAudioUrl]);
 
   const toggleRecording = async () => {
     console.log(`VIC: toggleRecording. Current state: ${recordingStateRef.current}`);
     if (disabled) return;
+
     if (recordingStateRef.current === "recording" || recordingStateRef.current === "listening") {
       speechRecorderRef.current?.stopRecording();
     } else {
       setErrorDetails(null);
-      setRecordingState("listening"); // Indicate attempt to listen
+      setRecordingState("listening"); 
       await speechRecorderRef.current?.startRecording();
     }
   };
 
   const handleTextDisplaySave = (newText: string) => {
-    setFinalTranscript(newText);
-    onSave(newText, currentAudioBlob, currentAudioUrl);
+    setFinalTranscript(newText); 
+    onSave(newText, currentAudioBlob, currentAudioUrl); 
     toast.success("Text saved manually!");
   };
 
   const handleRetryError = () => {
-    setRecordingState("idle");
     setErrorDetails(null);
+    setRecordingState("idle");
   };
   
-  const getButtonIcon = () => { /* ... (same) ... */ 
+  const getButtonIcon = () => {
     if (recordingState === "error") return <RotateCcw className="w-5 h-5" />;
     if (recordingState === "recording" || recordingState === "listening") return <StopCircle className="w-5 h-5 text-red-500" />;
     return <Mic className="w-5 h-5" />;
   };
-  const getButtonText = () => { /* ... (same) ... */ 
+
+  const getButtonText = () => {
     if (recordingState === "error") return "Retry";
     if (recordingState === "recording") return "Stop Recording";
     if (recordingState === "listening") return "Listening...";
     return "Start Recording";
   };
+
   const isRecordingOrListening = recordingState === "recording" || recordingState === "listening";
 
-  return ( /* ... (JSX same as before, ensure WaveformDisplay conditions are correct) ... */ 
+  return (
     <div className={cn("p-3 sm:p-4 border rounded-lg shadow-sm bg-card w-full max-w-2xl mx-auto space-y-3", { "opacity-75 cursor-not-allowed": disabled })}>
       <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
         <Button 
