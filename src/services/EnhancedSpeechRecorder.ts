@@ -232,18 +232,36 @@ class EnhancedSpeechRecorder {
     this.clearSilenceTimer();
 
     if (this.recognition) {
-      this.recognition.stop();
+      // Check if recognition is active before trying to stop
+      // This check is a bit heuristic as there's no universal 'isActive' property
+      try {
+        this.recognition.stop();
+      } catch (e) {
+        // Some browsers throw an error if stop() is called when not active.
+        console.warn("Error calling recognition.stop():", e);
+      }
     }
     if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
       this.mediaRecorder.stop(); // Triggers onstop for MediaRecorder
     } else if (this.mediaRecorder && this.mediaRecorder.state === "inactive" && this.audioChunks.length > 0) {
       // If mediaRecorder stopped before recognition (e.g. error), but we have chunks, process them.
+      // This case might be redundant if onstop always fires.
       this.options.onRecordingStop?.(new Blob(this.audioChunks, { type: "audio/webm" }), URL.createObjectURL(new Blob(this.audioChunks)));
       this.audioChunks = [];
     } else if (!this.mediaRecorder || this.mediaRecorder.state === "inactive") {
       // If media recorder never started or already stopped and no chunks, call onRecordingStop with null
       // This ensures onRecordingStop is called even if mediaRecorder failed or stopped early.
-      this.options.onRecordingStop?.(null, null);
+      // This is important for the VoiceInputCapture component to reset its state.
+      if (!this.isManuallyStopping || (this.isManuallyStopping && this.audioChunks.length === 0)) {
+         // Only call if it's an auto-stop or a manual stop with no audio,
+         // to avoid double-calling if mediaRecorder.onstop also fires.
+         // This logic is tricky; mediaRecorder.onstop should be the primary source of onRecordingStop.
+         // Let's simplify: onRecordingStop is primarily driven by mediaRecorder.onstop.
+         // If mediaRecorder never started, then this path is taken.
+         if (!this.mediaRecorder) {
+            this.options.onRecordingStop?.(null, null);
+         }
+      }
     }
     
     this.cleanupStreamAndAnalysis();

@@ -32,10 +32,12 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
   const handleFinalTranscriptSegment = useCallback((segment: string) => {
     if (segment) {
       accumulatedFinalTranscriptRef.current += (accumulatedFinalTranscriptRef.current.length > 0 ? " " : "") + segment;
-      // Display accumulated transcript in real-time in the editable area if not actively editing
-      // This provides a more "live" feel to the final text area.
+      // Update the visual display of finalTranscript in real-time if recording
+      // This makes the EditableTextDisplay feel more live.
       if (recordingState === "recording") {
-        setFinalTranscript(prev => (prev.trim() && !accumulatedFinalTranscriptRef.current.startsWith(prev.trim()) ? prev.trim() + " " : "") + accumulatedFinalTranscriptRef.current);
+        // Append new segment to what's currently in finalTranscript state
+        // This allows manual edits to be preserved if user types then speaks more.
+        setFinalTranscript(prev => (prev.trim() ? prev.trim() + " " : "") + segment.trim());
       }
     }
   }, [recordingState]);
@@ -50,13 +52,12 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
     setRecordingState("recording");
     setErrorDetails(null);
     setInterimTranscript("");
-    // Reset accumulated transcript only if not appending to existing finalTranscript
-    // If finalTranscript is empty, or we want to always start fresh for the accumulator:
-    accumulatedFinalTranscriptRef.current = ""; 
+    accumulatedFinalTranscriptRef.current = ""; // Reset for new speech session
     
-    // If initialText was present, and user starts recording, decide if we append or replace.
-    // Current behavior: accumulated starts fresh, handleRecordingStop appends it to existing finalTranscript.
-    // This means if user edits text, then records, new speech is appended.
+    // If there's existing text in finalTranscript (e.g. from initialText or previous edits),
+    // and the user starts recording, new speech will be appended.
+    // If we want to clear the text field on new recording start, uncomment:
+    // setFinalTranscript(""); 
 
     setCurrentAudioBlob(null);
     if (currentAudioUrl) {
@@ -69,33 +70,35 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
     setRecordingState("idle");
     setInterimTranscript("");
     
-    const newFinalTextFromSpeech = accumulatedFinalTranscriptRef.current.trim();
-    let textToSave = finalTranscript; // Start with current text in editor
+    // The final text from the speech session is in accumulatedFinalTranscriptRef.current
+    // The finalTranscript state already reflects live updates from handleFinalTranscriptSegment.
+    const textFromThisSession = accumulatedFinalTranscriptRef.current.trim();
+    const currentEditorText = finalTranscript.trim(); // Text currently in the editor
 
-    if (newFinalTextFromSpeech) {
-      // If there was new speech, update the finalTranscript state to reflect it.
-      // The logic here ensures that if the user edited the text while speech was accumulating,
-      // the new speech is appended to the potentially edited version.
-      // However, handleFinalTranscriptSegment already updates finalTranscript live.
-      // So, by the time we are here, finalTranscript should already contain the latest.
-      textToSave = finalTranscript; // finalTranscript is already updated by handleFinalTranscriptSegment
-    }
-    
+    let textToSave = currentEditorText;
+
+    // If new speech was recorded, textToSave is already up-to-date via handleFinalTranscriptSegment.
+    // If user edited the text while speech was also coming in, finalTranscript should reflect that.
+    // If no new speech, but editor has text (e.g. typed), that's textToSave.
+
     setCurrentAudioBlob(audioBlob);
     setCurrentAudioUrl(audioUrl);
 
-    // Auto-save if there's text (either from speech or typed and then speech stopped)
-    // And ensure we don't save an empty string if nothing was said/typed.
-    if (textToSave.trim()) {
+    // Auto-save if there's any text to save (from speech or typing)
+    // or if there's an audio blob (even if transcription was empty).
+    if (textToSave || audioBlob) {
       onSave(textToSave, audioBlob, audioUrl);
-    } else if (audioBlob) {
-      // If there's audio but no text (e.g. "no-speech" error led to stop but audio was captured)
-      // Optionally save with empty text or handle as per requirements.
-      // For now, we only save if there's text.
-      console.log("Recording stopped with audio but no transcript. Not auto-saving.");
+    } else {
+      console.log("Recording stopped with no text and no audio. Not auto-saving.");
+      // If onSave is not called, the parent (Index.tsx) won't reset the captureKey,
+      // so the VoiceInputCapture component won't reset its internal finalTranscript.
+      // This is generally fine, as the user might want to type something.
+      // If a reset is desired even on empty auto-stop, onSave should be called with empty values.
     }
     
-    // Reset for next potential recording, but finalTranscript is preserved until next save or reset
+    // Reset accumulator for the next potential recording session.
+    // finalTranscript (editor content) is preserved until a new recording starts and clears it,
+    // or until the parent component re-mounts VoiceInputCapture (e.g. via captureKey).
     accumulatedFinalTranscriptRef.current = "";
 
   }, [finalTranscript, onSave]);
@@ -128,9 +131,12 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
       speechRecorderRef.current?.stopRecording();
       if (currentAudioUrl) URL.revokeObjectURL(currentAudioUrl);
     };
-  }, [handleFinalTranscriptSegment, handleInterimTranscript, handleRecordingStart, handleRecordingStop, handleError, handleAudioData, silenceTimeout, currentAudioUrl]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handleFinalTranscriptSegment, handleInterimTranscript, handleRecordingStart, handleRecordingStop, handleError, handleAudioData, silenceTimeout]); 
+  // currentAudioUrl removed from deps to prevent re-creating recorder when it changes. It's cleaned up in return.
   
   useEffect(() => {
+    // Sync with initialText prop, but only if not actively recording or if initialText truly changes
     if (recordingState !== 'recording' && recordingState !== 'listening') {
         setFinalTranscript(initialText);
     }
@@ -139,22 +145,20 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
   const toggleRecording = async () => {
     if (disabled) return;
     if (recordingState === "recording" || recordingState === "listening") {
-      speechRecorderRef.current?.stopRecording();
+      speechRecorderRef.current?.stopRecording(); // This will trigger handleRecordingStop, which then calls onSave
     } else {
       setErrorDetails(null);
       setRecordingState("listening"); 
-      // When starting a new recording, ensure finalTranscript reflects what's in the editor
-      // or clear it if we want each recording to be "fresh" in the editor.
-      // For now, it keeps the current editor content, and new speech appends.
-      // If you want to clear editor on new record: setFinalTranscript("");
+      // When starting a new recording, `handleRecordingStart` will clear `accumulatedFinalTranscriptRef`.
+      // `finalTranscript` (editor content) is preserved unless `handleRecordingStart` explicitly clears it.
       await speechRecorderRef.current?.startRecording();
     }
   };
 
   const handleTextDisplaySave = (newText: string) => {
-    // This save is manual, from EditableTextDisplay
-    setFinalTranscript(newText);
-    onSave(newText, currentAudioBlob, currentAudioUrl);
+    // This save is manual, from EditableTextDisplay after user edits
+    setFinalTranscript(newText); // Update internal state to reflect edit
+    onSave(newText, currentAudioBlob, currentAudioUrl); // Propagate save with current audio
     toast.success("Text saved manually!");
   };
 
@@ -190,8 +194,8 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
         </Button>
         <div className="flex-grow w-full">
           <EditableTextDisplay
-            initialText={finalTranscript} // This will now update more "live"
-            onTextChange={handleTextDisplaySave} // Manual save from editor
+            initialText={finalTranscript} 
+            onTextChange={handleTextDisplaySave} 
             placeholder={placeholder}
             className="w-full"
           />
