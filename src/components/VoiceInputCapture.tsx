@@ -8,7 +8,7 @@ import { VoiceInputCaptureProps, RecordingState } from '@/types';
 import { cn } from '@/lib/utils';
 import { toast } from "sonner";
 
-const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: number }> = ({
+const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: number; initialSpeechTimeout?: number }> = ({
   onSave,
   initialText = "",
   showWaveform = true,
@@ -17,109 +17,102 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
   placeholder = "Speak or type here...",
   disabled = false,
   silenceTimeout,
+  initialSpeechTimeout, // New prop
 }) => {
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [interimTranscript, setInterimTranscript] = useState<string>("");
-  const [finalTranscript, setFinalTranscript] = useState<string>(initialText); // Text in the editor
+  const [finalTranscript, setFinalTranscript] = useState<string>(initialText);
   const [audioDataForWaveform, setAudioDataForWaveform] = useState<Uint8Array | null>(null);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [currentAudioBlob, setCurrentAudioBlob] = useState<Blob | null>(null);
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
   
   const speechRecorderRef = useRef<EnhancedSpeechRecorder | null>(null);
-  const accumulatedFinalTranscriptRef = useRef<string>(""); // Accumulates speech for the current session
-
-  // Ref to hold the latest recordingState for stable callbacks
+  const accumulatedFinalTranscriptRef = useRef<string>("");
   const recordingStateRef = useRef(recordingState);
+
   useEffect(() => {
     recordingStateRef.current = recordingState;
   }, [recordingState]);
 
   const handleFinalTranscriptSegment = useCallback((segment: string) => {
-    console.log("VIC: handleFinalTranscriptSegment received segment:", segment);
+    console.log("VIC: Final segment:", segment);
     if (segment) {
-      // Update the raw accumulator for the current speech session
-      const currentAccumulated = accumulatedFinalTranscriptRef.current;
-      accumulatedFinalTranscriptRef.current = (currentAccumulated ? currentAccumulated.trim() + " " : "") + segment.trim();
-      console.log("VIC: accumulatedFinalTranscriptRef.current is now:", accumulatedFinalTranscriptRef.current);
-
-      // If actively recording, update the visual editor (finalTranscript state)
-      // This appends the new segment to whatever is currently in the editor.
+      accumulatedFinalTranscriptRef.current = (accumulatedFinalTranscriptRef.current.trim() + " " + segment.trim()).trim();
+      // Live update the editor only if recording
       if (recordingStateRef.current === "recording") {
-        setFinalTranscript(prevEditorText => (prevEditorText.trim() ? prevEditorText.trim() + " " : "") + segment.trim());
+        setFinalTranscript(prev => (prev.trim() + " " + segment.trim()).trim());
       }
     }
-  }, []); // Stable: empty dependency array, uses ref for recordingState
+  }, []);
 
   const handleInterimTranscript = useCallback((transcript: string) => {
-    if (showInterimTranscript) {
-      setInterimTranscript(transcript);
-    }
+    if (showInterimTranscript) setInterimTranscript(transcript);
   }, [showInterimTranscript]);
 
   const handleRecordingStart = useCallback(() => {
-    console.log("VIC: handleRecordingStart callback. Setting state to 'recording'.");
+    console.log("VIC: Recording actually started (onstart event).");
     setRecordingState("recording");
     setErrorDetails(null);
     setInterimTranscript("");
-    accumulatedFinalTranscriptRef.current = ""; // Reset accumulator for new speech session
-    
-    // When a new recording starts, we clear the editor text (finalTranscript)
-    // and any previously captured audio for this instance of VoiceInputCapture.
+    accumulatedFinalTranscriptRef.current = ""; 
     setFinalTranscript(""); // Clear editor for new recording
-    
     setCurrentAudioBlob(null);
-    if (currentAudioUrl) {
-      URL.revokeObjectURL(currentAudioUrl);
-      setCurrentAudioUrl(null);
-    }
-  }, [currentAudioUrl]); // currentAudioUrl is a dependency for cleanup
+    setCurrentAudioUrl(prevUrl => {
+      if (prevUrl) URL.revokeObjectURL(prevUrl);
+      return null;
+    });
+  }, []);
 
   const handleRecordingStop = useCallback((audioBlob: Blob | null, audioUrl: string | null) => {
-    console.log(`VIC: handleRecordingStop. Accumulated speech: "${accumulatedFinalTranscriptRef.current}"`);
+    console.log(`VIC: Recording stopped. Accumulated: "${accumulatedFinalTranscriptRef.current}". Blob: ${!!audioBlob}`);
     setRecordingState("idle");
     setInterimTranscript("");
     
-    // The text from the entire speech session is in accumulatedFinalTranscriptRef.current
-    // The finalTranscript state should reflect this due to live updates in handleFinalTranscriptSegment.
-    // We use finalTranscript as the source of truth for text to save, as user might have edited it.
-    const textToSave = finalTranscript.trim();
+    const textFromSpeech = accumulatedFinalTranscriptRef.current.trim();
+    // finalTranscript might have been edited manually, so we prioritize it if it has content,
+    // otherwise, we use textFromSpeech.
+    let textToSave = finalTranscript.trim();
+    if (!textToSave && textFromSpeech) { // If editor is empty but speech was captured
+        textToSave = textFromSpeech;
+        setFinalTranscript(textToSave); // Update editor to show what was captured
+    } else if (textToSave && textFromSpeech && !textToSave.includes(textFromSpeech)) {
+        // If editor has text and speech has different/additional text, append speech
+        textToSave = (textToSave + " " + textFromSpeech).trim();
+        setFinalTranscript(textToSave);
+    }
+
 
     setCurrentAudioBlob(audioBlob);
     setCurrentAudioUrl(audioUrl);
 
-    if (textToSave) { // Only save if there's actual text
+    if (textToSave) {
       console.log("VIC: Calling onSave with text:", textToSave);
       onSave(textToSave, audioBlob, audioUrl);
     } else {
       console.log("VIC: No text detected to save.");
       toast.info("No text detected for dictation.");
-      // If onSave is not called, Index.tsx won't create a new entry or reset captureKey.
-      // This means VoiceInputCapture retains its current (empty) finalTranscript.
-      // If a reset of VoiceInputCapture is desired even on empty, onSave would need to be called.
-      // For now, we don't call onSave, so the user can try typing or recording again.
+      // If onSave is not called, parent won't reset captureKey.
+      // We might want to clear finalTranscript here if no save occurs.
+      setFinalTranscript(""); // Clear editor if nothing was saved
     }
-    // Reset accumulator for the next potential recording session.
-    // finalTranscript (editor content) is now set. It will be cleared by handleRecordingStart on next record.
     accumulatedFinalTranscriptRef.current = "";
   }, [finalTranscript, onSave]);
 
   const handleError = useCallback((error: string) => {
-    console.error(`VIC: handleError. Error: ${error}`);
+    console.error(`VIC: Error: ${error}`);
     setRecordingState("error");
     setInterimTranscript("");
     setAudioDataForWaveform(null);
-    toast.error(error || "An unknown recording error occurred.", { duration: 5000 });
+    toast.error(error || "Recording error.", { duration: 5000 });
   }, []);
 
   const handleAudioData = useCallback((dataArray: Uint8Array) => {
-    if (showWaveform) {
-      setAudioDataForWaveform(new Uint8Array(dataArray));
-    }
+    if (showWaveform) setAudioDataForWaveform(new Uint8Array(dataArray));
   }, [showWaveform]);
 
   useEffect(() => {
-    console.log("VIC: useEffect for EnhancedSpeechRecorder setup. Current recordingState:", recordingStateRef.current);
+    console.log("VIC: Initializing/Re-initializing EnhancedSpeechRecorder.");
     speechRecorderRef.current = new EnhancedSpeechRecorder({
       onFinalTranscript: handleFinalTranscriptSegment,
       onInterimTranscript: handleInterimTranscript,
@@ -128,76 +121,61 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
       onError: handleError,
       onAudioData: handleAudioData,
       silenceTimeout: silenceTimeout,
+      initialSpeechTimeout: initialSpeechTimeout,
     });
     return () => {
-      console.log("VIC: Cleanup useEffect - Stopping recorder.");
+      console.log("VIC: Cleanup: Stopping EnhancedSpeechRecorder.");
       speechRecorderRef.current?.stopRecording();
     };
-  }, [handleFinalTranscriptSegment, handleInterimTranscript, handleRecordingStart, handleRecordingStop, handleError, handleAudioData, silenceTimeout]);
+  }, [handleFinalTranscriptSegment, handleInterimTranscript, handleRecordingStart, handleRecordingStop, handleError, handleAudioData, silenceTimeout, initialSpeechTimeout]);
   
   useEffect(() => {
-    // Sync with initialText prop, but only if not actively recording/listening
-    // and if initialText is different from current finalTranscript.
-    // This is mainly for when the component is controlled externally.
     if (recordingStateRef.current !== 'recording' && recordingStateRef.current !== 'listening') {
-      if (initialText !== finalTranscript) {
-        setFinalTranscript(initialText);
-      }
+      if (initialText !== finalTranscript) setFinalTranscript(initialText);
     }
-  }, [initialText, finalTranscript]); // Rerun if initialText or finalTranscript changes
+  }, [initialText, finalTranscript]);
 
   useEffect(() => {
-    // Cleanup for currentAudioUrl when component unmounts or URL changes and needs revoking
-    const urlToRevoke = currentAudioUrl;
-    return () => {
-      if (urlToRevoke) {
-        // console.log("VIC: Unmount/cleanup - Revoking object URL:", urlToRevoke);
-        URL.revokeObjectURL(urlToRevoke);
-      }
-    };
+    return () => { if (currentAudioUrl) URL.revokeObjectURL(currentAudioUrl); };
   }, [currentAudioUrl]);
 
   const toggleRecording = async () => {
     console.log(`VIC: toggleRecording. Current state: ${recordingStateRef.current}`);
     if (disabled) return;
-
     if (recordingStateRef.current === "recording" || recordingStateRef.current === "listening") {
       speechRecorderRef.current?.stopRecording();
     } else {
       setErrorDetails(null);
-      setRecordingState("listening"); 
+      setRecordingState("listening"); // Indicate attempt to listen
       await speechRecorderRef.current?.startRecording();
     }
   };
 
   const handleTextDisplaySave = (newText: string) => {
-    // Manual save from EditableTextDisplay
-    setFinalTranscript(newText); // Update internal state
-    onSave(newText, currentAudioBlob, currentAudioUrl); // Propagate save
+    setFinalTranscript(newText);
+    onSave(newText, currentAudioBlob, currentAudioUrl);
     toast.success("Text saved manually!");
   };
 
   const handleRetryError = () => {
-    setErrorDetails(null);
     setRecordingState("idle");
+    setErrorDetails(null);
   };
   
-  const getButtonIcon = () => {
+  const getButtonIcon = () => { /* ... (same) ... */ 
     if (recordingState === "error") return <RotateCcw className="w-5 h-5" />;
     if (recordingState === "recording" || recordingState === "listening") return <StopCircle className="w-5 h-5 text-red-500" />;
     return <Mic className="w-5 h-5" />;
   };
-
-  const getButtonText = () => {
+  const getButtonText = () => { /* ... (same) ... */ 
     if (recordingState === "error") return "Retry";
     if (recordingState === "recording") return "Stop Recording";
     if (recordingState === "listening") return "Listening...";
     return "Start Recording";
   };
-
   const isRecordingOrListening = recordingState === "recording" || recordingState === "listening";
 
-  return (
+  return ( /* ... (JSX same as before, ensure WaveformDisplay conditions are correct) ... */ 
     <div className={cn("p-3 sm:p-4 border rounded-lg shadow-sm bg-card w-full max-w-2xl mx-auto space-y-3", { "opacity-75 cursor-not-allowed": disabled })}>
       <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
         <Button 
@@ -218,7 +196,6 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
           />
         </div>
       </div>
-      {/* ... (rest of the JSX remains the same) ... */}
       {recordingState === "error" && errorDetails && (
         <div className="flex items-center p-2 text-sm text-destructive-foreground bg-destructive rounded-md">
           <AlertTriangle className="w-4 h-4 mr-2 flex-shrink-0" /> <span>Error: {errorDetails}</span>
