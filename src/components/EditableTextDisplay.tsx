@@ -2,12 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Edit3, Check, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface EditableTextDisplayProps {
   initialText: string;
   onTextChange: (newText: string) => void;
   isEditingInitially?: boolean;
   placeholder?: string;
+  className?: string;
+  textAreaClassName?: string;
 }
 
 const EditableTextDisplay: React.FC<EditableTextDisplayProps> = ({
@@ -15,6 +18,8 @@ const EditableTextDisplay: React.FC<EditableTextDisplayProps> = ({
   onTextChange,
   isEditingInitially = false,
   placeholder = "Enter text...",
+  className,
+  textAreaClassName,
 }) => {
   const [isEditing, setIsEditing] = useState(isEditingInitially);
   const [currentText, setCurrentText] = useState(initialText);
@@ -27,12 +32,13 @@ const EditableTextDisplay: React.FC<EditableTextDisplayProps> = ({
   useEffect(() => {
     if (isEditing && textareaRef.current) {
       textareaRef.current.focus();
-      textareaRef.current.select(); // Select all text when editing starts
+      // Move cursor to the end of the text
+      textareaRef.current.setSelectionRange(textareaRef.current.value.length, textareaRef.current.value.length);
       autoResizeTextarea();
     }
   }, [isEditing]);
 
-  const handleTextChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleCurrentTextChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     setCurrentText(event.target.value);
     autoResizeTextarea();
   };
@@ -53,16 +59,7 @@ const EditableTextDisplay: React.FC<EditableTextDisplayProps> = ({
     setCurrentText(initialText); // Revert to original text
     setIsEditing(false);
   };
-
-  const handleEditToggle = () => {
-    if (isEditing) {
-      handleSave(); // Save if currently editing
-    } else {
-      setIsEditing(true);
-    }
-  };
   
-  // Update textarea size when currentText changes (e.g. from speech input)
   useEffect(() => {
     if (isEditing) {
       autoResizeTextarea();
@@ -72,21 +69,21 @@ const EditableTextDisplay: React.FC<EditableTextDisplayProps> = ({
 
   if (isEditing) {
     return (
-      <div className="w-full space-y-2">
+      <div className={cn("w-full space-y-2", className)}>
         <Textarea
           ref={textareaRef}
           value={currentText}
-          onChange={handleTextChange}
+          onChange={handleCurrentTextChange}
           placeholder={placeholder}
-          className="w-full p-2 border rounded-md resize-none min-h-[60px]"
-          rows={1} // Start with one row, auto-resize will adjust
+          className={cn("w-full p-2 border rounded-md resize-none min-h-[60px] leading-relaxed", textAreaClassName)}
+          rows={1} 
         />
         <div className="flex justify-end space-x-2">
-          <Button onClick={handleSave} size="sm" variant="outline">
-            <Check className="w-4 h-4 mr-1" /> Save
+          <Button onClick={handleSave} size="sm">
+            <Check className="w-4 h-4 mr-1 sm:mr-2" /> <span className="hidden sm:inline">Save</span>
           </Button>
-          <Button onClick={handleCancel} size="sm" variant="ghost">
-            <X className="w-4 h-4 mr-1" /> Cancel
+          <Button onClick={handleCancel} size="sm" variant="outline">
+            <X className="w-4 h-4 mr-1 sm:mr-2" /> <span className="hidden sm:inline">Cancel</span>
           </Button>
         </div>
       </div>
@@ -94,12 +91,18 @@ const EditableTextDisplay: React.FC<EditableTextDisplayProps> = ({
   }
 
   return (
-    <div className="w-full p-2 border border-transparent rounded-md group min-h-[60px] hover:border-gray-300 relative cursor-text" onClick={() => setIsEditing(true)}>
-      {currentText || <span className="text-gray-400">{placeholder}</span>}
+    <div 
+      className={cn("w-full p-2.5 border border-transparent rounded-md group min-h-[60px] hover:border-gray-300 dark:hover:border-gray-700 relative cursor-text whitespace-pre-wrap break-words leading-relaxed", className)} 
+      onClick={() => setIsEditing(true)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setIsEditing(true);}}
+    >
+      {currentText || <span className="text-muted-foreground">{placeholder}</span>}
       <Button
         variant="ghost"
         size="icon"
-        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute top-1 right-1 h-7 w-7 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
         onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
         aria-label="Edit text"
       >

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from "@/components/ui/button";
-import { Mic, StopCircle, AlertTriangle, Edit3, Save } from 'lucide-react';
+import { Mic, StopCircle, AlertTriangle, RotateCcw } from 'lucide-react';
 import EditableTextDisplay from './EditableTextDisplay';
 import WaveformDisplay from './WaveformDisplay';
 import EnhancedSpeechRecorder from '@/services/EnhancedSpeechRecorder';
@@ -26,15 +26,14 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
   
   const speechRecorderRef = useRef<EnhancedSpeechRecorder | null>(null);
-  // To accumulate final transcript segments during a single recording session
-  const currentRecordingFinalTranscriptRef = useRef<string>("");
+  const accumulatedFinalTranscriptRef = useRef<string>(""); // Accumulates during one recording session
 
-
-  const handleFinalTranscript = useCallback((transcript: string) => {
-    console.log("Final transcript segment:", transcript);
-    currentRecordingFinalTranscriptRef.current += (currentRecordingFinalTranscriptRef.current.length > 0 ? " " : "") + transcript;
-    // Update the main finalTranscript state only when recording stops or explicitly saved
-    // This allows interim to show live updates without overwriting the editable area constantly
+  const handleFinalTranscriptSegment = useCallback((segment: string) => {
+    console.log("Final transcript segment:", segment);
+    if (segment) {
+      accumulatedFinalTranscriptRef.current += (accumulatedFinalTranscriptRef.current.length > 0 ? " " : "") + segment;
+    }
+    // The final transcript is set to EditableTextDisplay upon recording stop.
   }, []);
 
   const handleInterimTranscript = useCallback((transcript: string) => {
@@ -44,62 +43,58 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
   }, [showInterimTranscript]);
 
   const handleRecordingStart = useCallback(() => {
-    console.log("Recording started callback");
+    console.log("Event: Recording started");
     setRecordingState("recording");
     setErrorDetails(null);
     setInterimTranscript("");
-    currentRecordingFinalTranscriptRef.current = ""; // Reset for new recording
-  }, []);
+    accumulatedFinalTranscriptRef.current = ""; // Reset for new recording session
+    setCurrentAudioBlob(null); // Clear previous audio
+    if (currentAudioUrl) URL.revokeObjectURL(currentAudioUrl); // Revoke old URL
+    setCurrentAudioUrl(null);
+  }, [currentAudioUrl]);
 
   const handleRecordingStop = useCallback((audioBlob: Blob | null, audioUrl: string | null) => {
-    console.log("Recording stopped callback. Audio Blob:", audioBlob, "Audio URL:", audioUrl);
-    setRecordingState("idle"); // Or 'processing' if we add that state
+    console.log("Event: Recording stopped. Audio Blob:", audioBlob, "Audio URL:", audioUrl);
+    setRecordingState("idle");
     setInterimTranscript(""); // Clear interim transcript
-    setAudioDataForWaveform(null); // Clear waveform
+    // Waveform data is cleared by onAudioData not being called anymore
     
-    // Set the accumulated final transcript to the main state
-    setFinalTranscript(prev => {
-      // If there was previous text and new speech, append. Otherwise, replace.
-      // This logic might need refinement based on desired UX.
-      // For now, if initialText was present and user spoke, it appends.
-      // If user clears text and speaks, it sets.
-      // If user speaks multiple times, it appends.
-      const newText = currentRecordingFinalTranscriptRef.current.trim();
-      if (newText) {
-        return (prev.trim() ? prev.trim() + " " : "") + newText;
-      }
-      return prev; // No new speech, keep existing
-    });
-
+    const newFinalText = accumulatedFinalTranscriptRef.current.trim();
+    if (newFinalText) {
+      setFinalTranscript(prev => (prev.trim() ? prev.trim() + " " : "") + newFinalText);
+    }
+    
     if (audioBlob) setCurrentAudioBlob(audioBlob);
     if (audioUrl) setCurrentAudioUrl(audioUrl);
     
-    // Automatically save if there's new transcript
-    // if (currentRecordingFinalTranscriptRef.current.trim()) {
-    //   onSave(currentRecordingFinalTranscriptRef.current.trim(), audioBlob, audioUrl);
+    // The text is now in finalTranscript, user can edit then save via EditableTextDisplay
+    // Or, if auto-save is desired on stop, call onSave here:
+    // if (newFinalText) {
+    //   onSave((finalTranscript.trim() ? finalTranscript.trim() + " " : "") + newFinalText, audioBlob, audioUrl);
+    // } else if (finalTranscript.trim()) { // Save existing text if no new speech but audio was recorded
+    //   onSave(finalTranscript, audioBlob, audioUrl);
     // }
-    // For now, let's require explicit save via EditableTextDisplay or a dedicated save button
-  }, [onSave]);
+
+  }, []);
 
   const handleError = useCallback((error: string) => {
     console.error("Speech recognition error:", error);
     setErrorDetails(error);
     setRecordingState("error");
     setInterimTranscript("");
-    setAudioDataForWaveform(null);
-    toast.error(error || "An unknown recording error occurred.");
+    setAudioDataForWaveform(null); // Clear waveform on error
+    toast.error(error || "An unknown recording error occurred.", { duration: 5000 });
   }, []);
 
   const handleAudioData = useCallback((dataArray: Uint8Array) => {
     if (showWaveform) {
-      // Create a copy of the Uint8Array to ensure React detects changes
-      setAudioDataForWaveform(new Uint8Array(dataArray));
+      setAudioDataForWaveform(new Uint8Array(dataArray)); // Create a copy
     }
   }, [showWaveform]);
 
   useEffect(() => {
     speechRecorderRef.current = new EnhancedSpeechRecorder({
-      onFinalTranscript: handleFinalTranscript,
+      onFinalTranscript: handleFinalTranscriptSegment,
       onInterimTranscript: handleInterimTranscript,
       onRecordingStart: handleRecordingStart,
       onRecordingStop: handleRecordingStop,
@@ -108,13 +103,21 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
     });
 
     return () => {
-      speechRecorderRef.current?.stopRecording(); // Ensure cleanup
+      speechRecorderRef.current?.stopRecording();
+      if (currentAudioUrl) {
+        URL.revokeObjectURL(currentAudioUrl);
+      }
     };
-  }, [handleFinalTranscript, handleInterimTranscript, handleRecordingStart, handleRecordingStop, handleError, handleAudioData]);
+  }, [handleFinalTranscriptSegment, handleInterimTranscript, handleRecordingStart, handleRecordingStop, handleError, handleAudioData, currentAudioUrl]);
   
   useEffect(() => {
-    setFinalTranscript(initialText); // Sync with initialText prop
-  }, [initialText]);
+    // Sync with initialText prop, but only if not actively recording or if initialText truly changes
+    // This prevents overwriting user's speech if initialText prop re-renders without actual change
+    if (recordingState !== 'recording' && recordingState !== 'listening') {
+        setFinalTranscript(initialText);
+        accumulatedFinalTranscriptRef.current = ""; // Reset if initial text changes
+    }
+  }, [initialText, recordingState]);
 
   const toggleRecording = async () => {
     if (disabled) return;
@@ -122,74 +125,94 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
     if (recordingState === "recording" || recordingState === "listening") {
       speechRecorderRef.current?.stopRecording();
     } else {
-      setErrorDetails(null);
-      setRecordingState("listening"); // Transition to listening state
-      // Reset transcripts for a new session if user explicitly starts recording
-      setInterimTranscript("");
-      // currentRecordingFinalTranscriptRef.current = ""; // Decided to append by default
+      setErrorDetails(null); // Clear previous errors
+      setRecordingState("listening"); 
       try {
         await speechRecorderRef.current?.startRecording();
       } catch (e) {
-        // Error is handled by the onError callback in EnhancedSpeechRecorder
+        // Error should be handled by the onError callback in EnhancedSpeechRecorder
+        // but if startRecording itself throws synchronously before async ops, catch here.
+        if (e instanceof Error) handleError(e.message);
+        else handleError("Failed to start recording.");
       }
     }
   };
 
   const handleTextDisplaySave = (newText: string) => {
-    setFinalTranscript(newText);
-    onSave(newText, currentAudioBlob, currentAudioUrl); // Save text and any associated audio
+    setFinalTranscript(newText); // Update local state
+    onSave(newText, currentAudioBlob, currentAudioUrl); // Propagate save
     toast.success("Text saved!");
   };
+
+  const handleRetryError = () => {
+    setErrorDetails(null);
+    setRecordingState("idle");
+  }
   
   const getButtonIcon = () => {
+    if (recordingState === "error") return <RotateCcw className="w-5 h-5" />;
     if (recordingState === "recording" || recordingState === "listening") {
-      return <StopCircle className="w-5 h-5" />;
+      return <StopCircle className="w-5 h-5 text-red-500" />;
     }
     return <Mic className="w-5 h-5" />;
   };
 
   const getButtonText = () => {
+    if (recordingState === "error") return "Retry";
     if (recordingState === "recording") return "Stop Recording";
     if (recordingState === "listening") return "Listening...";
     return "Start Recording";
   };
 
+  const isRecordingOrListening = recordingState === "recording" || recordingState === "listening";
+
   return (
-    <div className={cn("p-4 border rounded-lg shadow-sm bg-card w-full max-w-2xl mx-auto space-y-3", { "opacity-75 cursor-not-allowed": disabled })}>
-      <div className="flex items-center space-x-2">
-        <Button onClick={toggleRecording} disabled={disabled || recordingState === "error"} className="flex-shrink-0">
+    <div className={cn("p-3 sm:p-4 border rounded-lg shadow-sm bg-card w-full max-w-2xl mx-auto space-y-3", { "opacity-75 cursor-not-allowed": disabled })}>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+        <Button 
+          onClick={recordingState === 'error' ? handleRetryError : toggleRecording} 
+          disabled={disabled} 
+          className={cn("flex-shrink-0 w-full sm:w-auto", recordingState === 'error' ? "bg-yellow-500 hover:bg-yellow-600 text-white" : "")}
+          aria-label={getButtonText()}
+        >
           {getButtonIcon()}
-          <span className="ml-2 hidden sm:inline">{getButtonText()}</span>
+          <span className="ml-2">{getButtonText()}</span>
         </Button>
-        <div className="flex-grow">
+        <div className="flex-grow w-full">
           <EditableTextDisplay
             initialText={finalTranscript}
             onTextChange={handleTextDisplaySave}
             placeholder={placeholder}
+            className="w-full"
           />
         </div>
       </div>
 
       {recordingState === "error" && errorDetails && (
-        <div className="flex items-center p-2 text-sm text-red-700 bg-red-100 border border-red-300 rounded-md">
+        <div className="flex items-center p-2 text-sm text-destructive-foreground bg-destructive rounded-md">
           <AlertTriangle className="w-4 h-4 mr-2 flex-shrink-0" />
-          <span>{errorDetails}</span>
+          <span>Error: {errorDetails}</span>
         </div>
       )}
 
-      {showInterimTranscript && (recordingState === "recording" || recordingState === "listening") && interimTranscript && (
-        <div className="p-2 text-sm text-muted-foreground bg-muted/50 rounded-md min-h-[2.5rem]">
-          <em>{interimTranscript}</em>
+      {showInterimTranscript && isRecordingOrListening && interimTranscript && (
+        <div className="p-2 text-sm text-muted-foreground bg-muted/30 rounded-md min-h-[2.5rem] italic">
+          {interimTranscript}
         </div>
       )}
       
-      {showWaveform && (recordingState === "recording" || recordingState === "listening") && (
+      {showWaveform && isRecordingOrListening && (
          <WaveformDisplay 
             audioData={audioDataForWaveform} 
             color={customWaveformColor}
-            width={300} // Default or make configurable
-            height={60}  // Default or make configurable
-            className="w-full"
+            className="w-full h-16" // Example fixed height for waveform
+        />
+      )}
+      {showWaveform && recordingState === "idle" && !errorDetails && ( // Show a placeholder flat line when idle
+         <WaveformDisplay 
+            audioData={null} // Pass null to render flat line
+            color={customWaveformColor}
+            className="w-full h-16"
         />
       )}
     </div>
