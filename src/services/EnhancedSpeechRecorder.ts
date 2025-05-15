@@ -1,4 +1,4 @@
-import { VoiceInputCaptureProps, RecordingState } from '@/types'; // Assuming types are defined here
+import { VoiceInputCaptureProps, RecordingState } from '@/types'; 
 
 interface EnhancedSpeechRecorderOptions {
   onFinalTranscript: (transcript: string) => void;
@@ -7,14 +7,14 @@ interface EnhancedSpeechRecorderOptions {
   onRecordingStop: (audioBlob: Blob | null, audioUrl: string | null) => void;
   onError: (error: string) => void;
   onAudioData: (dataArray: Uint8Array) => void;
-  silenceTimeout?: number; // Milliseconds of silence to stop recording
-  initialSpeechTimeout?: number; // Milliseconds to wait for initial speech
-  continuous?: boolean; // Corresponds to SpeechRecognition.continuous
-  interimResults?: boolean; // Corresponds to SpeechRecognition.interimResults
+  silenceTimeout?: number; 
+  initialSpeechTimeout?: number; 
+  continuous?: boolean; 
+  interimResults?: boolean; 
 }
 
-const DEFAULT_SILENCE_TIMEOUT = 3000; // 3 seconds
-const DEFAULT_INITIAL_SPEECH_TIMEOUT = 5000; // 5 seconds
+const DEFAULT_SILENCE_TIMEOUT = 3000; 
+const DEFAULT_INITIAL_SPEECH_TIMEOUT = 5000; 
 
 class EnhancedSpeechRecorder {
   private mediaRecorder: MediaRecorder | null = null;
@@ -56,26 +56,29 @@ class EnhancedSpeechRecorder {
     this.speechRecognition = new SpeechRecognitionAPI();
     this.speechRecognition.continuous = this.options.continuous!;
     this.speechRecognition.interimResults = this.options.interimResults!;
-    this.speechRecognition.lang = navigator.language || 'en-US'; // Default to browser language or US English
+    this.speechRecognition.lang = navigator.language || 'en-US'; 
 
     this.speechRecognition.onresult = (event: SpeechRecognitionEvent) => {
-      // console.log("ESR: onresult fired.");
       this.clearInitialSpeechTimer();
       this.hasDetectedSpeech = true;
       this.resetSilenceTimer();
 
       let interimTranscript = "";
-      let finalTranscriptSegment = "";
-
+      // Process each result in the event
       for (let i = event.resultIndex; i < event.results.length; ++i) {
+        const transcriptPart = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
-          finalTranscriptSegment += event.results[i][0].transcript;
+          // Call onFinalTranscript for EACH final segment individually
+          console.log("ESR: Final segment received from speech engine:", transcriptPart);
+          this.options.onFinalTranscript(transcriptPart.trim()); 
         } else {
-          interimTranscript += event.results[i][0].transcript;
+          interimTranscript += transcriptPart;
         }
       }
-      if (finalTranscriptSegment) this.options.onFinalTranscript(finalTranscriptSegment);
-      if (interimTranscript) this.options.onInterimTranscript(interimTranscript);
+      // Update interim transcript if there is any
+      if (interimTranscript) {
+        this.options.onInterimTranscript(interimTranscript.trim());
+      }
     };
 
     this.speechRecognition.onerror = (event: SpeechRecognitionErrorEvent) => {
@@ -83,7 +86,7 @@ class EnhancedSpeechRecorder {
       let errorMessage = event.error;
       if (event.error === 'no-speech') {
         errorMessage = "No speech detected. Please try again.";
-        this.stopReason = 'initial_timeout'; // Or a specific 'no-speech' reason
+        this.stopReason = 'initial_timeout'; 
       } else if (event.error === 'audio-capture') {
         errorMessage = "Audio capture error. Check microphone permissions.";
       } else if (event.error === 'not-allowed') {
@@ -103,14 +106,6 @@ class EnhancedSpeechRecorder {
     
     this.speechRecognition.onend = () => {
       console.log("ESR: onend fired. Reason for stop (if known before onstop):", this.stopReason);
-      // This event fires when recognition stops, either manually or due to silence/error.
-      // The actual blob processing is handled in mediaRecorder.onstop
-      if (!this.isManuallyStopping && this.stopReason !== 'silence' && this.stopReason !== 'initial_timeout') {
-        // If not stopped by silence timer or manual stop, it might be an unexpected end.
-        // This could be due to 'no-speech' if continuous is false, or other reasons.
-      }
-      // Ensure recording is fully stopped if speech recognition ends.
-      // This is a fallback.
       if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
          this.stopRecordingInternal(this.stopReason || 'manual');
       }
@@ -118,10 +113,7 @@ class EnhancedSpeechRecorder {
 
     this.speechRecognition.onspeechend = () => {
         console.log("ESR: onspeechend fired.");
-        // This event means the user has stopped speaking.
-        // We rely on our silence timer to actually stop the recording if continuous is true.
-        // If continuous is false, speechRecognition.onend will fire soon after.
-        this.resetSilenceTimer(); // Reset here as well, as speech might resume if continuous
+        this.resetSilenceTimer(); 
     };
   }
 
@@ -141,7 +133,6 @@ class EnhancedSpeechRecorder {
 
   private clearInitialSpeechTimer() {
     if (this.initialSpeechTimeoutId) {
-      // console.log("ESR: Clearing initial speech timer.");
       clearTimeout(this.initialSpeechTimeoutId);
       this.initialSpeechTimeoutId = null;
     }
@@ -149,7 +140,6 @@ class EnhancedSpeechRecorder {
 
   private resetSilenceTimer() {
     this.clearSilenceTimer();
-    // console.log("ESR: Starting silence (pause) timer for ms:", this.options.silenceTimeout);
     this.silenceTimeoutId = setTimeout(() => {
       console.log("ESR: Silence (pause) detected, stopping recording.");
       this.stopReason = 'silence';
@@ -159,7 +149,6 @@ class EnhancedSpeechRecorder {
 
   private clearSilenceTimer() {
     if (this.silenceTimeoutId) {
-      // console.log("ESR: Clearing silence (pause) timer.");
       clearTimeout(this.silenceTimeoutId);
       this.silenceTimeoutId = null;
     }
@@ -178,13 +167,13 @@ class EnhancedSpeechRecorder {
 
       this.mediaRecorder.onstop = () => {
         console.log("ESR: mediaRecorder.onstop. Reason for stop:", this.stopReason);
-        const audioBlob = this.audioChunks.length > 0 ? new Blob(this.audioChunks, { type: this.audioChunks[0].type || 'audio/webm' }) : null;
+        const audioBlob = this.audioChunks.length > 0 ? new Blob(this.audioChunks, { type: this.audioChunks[0]?.type || 'audio/webm' }) : null;
         const audioUrl = audioBlob ? URL.createObjectURL(audioBlob) : null;
         this.options.onRecordingStop(audioBlob, audioUrl);
         this.cleanupAudioProcessing();
-        this.audioChunks = []; // Clear chunks for next recording
-        this.isManuallyStopping = false; // Reset manual stop flag
-        this.stopReason = null; // Reset stop reason
+        this.audioChunks = []; 
+        this.isManuallyStopping = false; 
+        this.stopReason = null; 
       };
       
       this.mediaRecorder.onerror = (event) => {
@@ -199,22 +188,18 @@ class EnhancedSpeechRecorder {
         return;
     }
 
-
-    // Setup Web Audio API for waveform
     try {
         this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
         this.analyserNode = this.audioContext.createAnalyser();
-        this.analyserNode.fftSize = 2048; // Standard FFT size
+        this.analyserNode.fftSize = 2048; 
         const bufferLength = this.analyserNode.frequencyBinCount;
         this.dataArray = new Uint8Array(bufferLength);
 
         this.sourceNode = this.audioContext.createMediaStreamSource(stream);
         this.sourceNode.connect(this.analyserNode);
-        // We don't connect analyserNode to destination to avoid echo/feedback if speakers are on.
         this.drawWaveform();
     } catch (error) {
         console.error("ESR: Error setting up Web Audio API for waveform:", error);
-        // Continue without waveform if this fails
     }
   }
 
@@ -236,7 +221,7 @@ class EnhancedSpeechRecorder {
       this.sourceNode = null;
     }
     if (this.analyserNode) {
-        this.analyserNode = null; // No disconnect method, just dereference
+        this.analyserNode = null; 
     }
     if (this.audioContext && this.audioContext.state !== 'closed') {
       this.audioContext.close().catch(e => console.warn("ESR: Error closing audio context", e));
@@ -265,9 +250,8 @@ class EnhancedSpeechRecorder {
       if (this.mediaRecorder) {
         this.mediaRecorder.start();
       }
-      this.speechRecognition.start(); // onstart will call options.onRecordingStart
-      this.hasDetectedSpeech = false; // Reset for new session
-      // Initial speech timer is started in speechRecognition.onstart
+      this.speechRecognition.start(); 
+      this.hasDetectedSpeech = false; 
 
     } catch (err) {
       console.error("ESR: Error starting recording:", err);
@@ -298,20 +282,17 @@ class EnhancedSpeechRecorder {
     this.clearSilenceTimer();
 
     if (this.speechRecognition) {
-      // Check state because calling stop on an already stopped recognition can throw an error
       try {
-        this.speechRecognition.stop(); // This will trigger speechRecognition.onend
+        this.speechRecognition.stop(); 
       } catch (e) {
         console.warn("ESR: Error stopping speech recognition (might be already stopped):", e);
       }
     }
 
     if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
-      this.mediaRecorder.stop(); // This will trigger mediaRecorder.onstop
+      this.mediaRecorder.stop(); 
     } else if (this.mediaRecorder && this.mediaRecorder.state === "inactive") {
-      // If mediaRecorder is already inactive but we have chunks (e.g. error case), process them.
-      // This ensures onRecordingStop is called.
-      if (this.audioChunks.length > 0 && !this.isManuallyStopping) { // Avoid double-processing if manually stopped and onstop already fired
+      if (this.audioChunks.length > 0 && !this.isManuallyStopping) { 
          const audioBlob = new Blob(this.audioChunks, { type: this.audioChunks[0]?.type || 'audio/webm' });
          const audioUrl = URL.createObjectURL(audioBlob);
          this.options.onRecordingStop(audioBlob, audioUrl);
@@ -319,15 +300,9 @@ class EnhancedSpeechRecorder {
       }
       this.cleanupAudioProcessing();
     } else {
-        // If no media recorder or not recording, still ensure cleanup and callback if needed
         this.cleanupAudioProcessing();
-        if (!this.isManuallyStopping) { // If not manually stopped, ensure onRecordingStop is called with nulls
-            // This case might happen if setup failed before mediaRecorder was active
-            // this.options.onRecordingStop(null, null); // Avoid calling if already called by mediaRecorder.onstop
-        }
     }
     
-    // Stop media stream tracks
     if (this.mediaRecorder && this.mediaRecorder.stream) {
         this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
     }
