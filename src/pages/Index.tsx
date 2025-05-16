@@ -1,4 +1,4 @@
-import VoiceInputCapture from "@/components/VoiceInputCapture"; // Corrected to default import
+import VoiceInputCapture from "@/components/VoiceInputCapture"; 
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -73,7 +73,7 @@ const Index = () => {
   return (
     <div className="container mx-auto p-4 sm:p-6 md:p-8 space-y-8">
       <header className="text-center">
-        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Voice Journal</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Notes Journal</h1>
         <p className="text-muted-foreground text-sm sm:text-base">
           Record your thoughts. Pauses or "stop recording" will save the entry.
         </p>
