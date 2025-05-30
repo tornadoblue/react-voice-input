@@ -1,4 +1,4 @@
-import { VoiceInputCaptureProps, RecordingState } from '@/types'; 
+// import { VoiceInputCaptureProps, RecordingState } from '@/types'; // Unused import
 
 interface EnhancedSpeechRecorderOptions {
   onFinalTranscript: (transcript: string) => void;
@@ -19,7 +19,7 @@ const DEFAULT_INITIAL_SPEECH_TIMEOUT = 5000;
 class EnhancedSpeechRecorder {
   private mediaRecorder: MediaRecorder | null = null;
   private audioChunks: Blob[] = [];
-  private speechRecognition: SpeechRecognition | null = null;
+  private speechRecognition: any | null = null; // Changed to any to bypass SpeechRecognition type issues
   private audioContext: AudioContext | null = null;
   private analyserNode: AnalyserNode | null = null;
   private sourceNode: MediaStreamAudioSourceNode | null = null;
@@ -58,7 +58,7 @@ class EnhancedSpeechRecorder {
     this.speechRecognition.interimResults = this.options.interimResults!;
     this.speechRecognition.lang = navigator.language || 'en-US'; 
 
-    this.speechRecognition.onresult = (event: SpeechRecognitionEvent) => {
+    this.speechRecognition.onresult = (event: any) => { // Changed event type to any
       this.clearInitialSpeechTimer();
       this.hasDetectedSpeech = true;
       this.resetSilenceTimer();
@@ -81,7 +81,7 @@ class EnhancedSpeechRecorder {
       }
     };
 
-    this.speechRecognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+    this.speechRecognition.onerror = (event: any) => { // Changed event type to any
       console.error("ESR: Speech recognition error", event.error, event.message);
       let errorMessage = event.error;
       if (event.error === 'no-speech') {

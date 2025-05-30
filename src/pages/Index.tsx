@@ -1,9 +1,9 @@
 import { VoiceInputCapture, VoiceInputCaptureProps } from "react-voice-input"; // Updated import
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { List, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 
 interface Recording {
   id: string;

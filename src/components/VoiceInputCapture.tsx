@@ -138,13 +138,13 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
             } else if (trimmedBuffer === decodedInfo.audioBuffer) {
               toast.info("Audio trim resulted in no change, using original audio.");
             } else { 
-              toast.warn("Audio trimming failed, using original audio.");
+              toast.info("Audio trimming failed, using original audio.");
             }
           } else {
             toast.info("No significant trailing silence to trim, using original audio.");
           }
         } else {
-          toast.warn("Audio decoding failed for trimming, using original audio.");
+          toast.info("Audio decoding failed for trimming, using original audio.");
         }
       }
     }
