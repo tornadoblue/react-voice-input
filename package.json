@@ -10,11 +10,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/react-voice-input.es.js",
-      "require": "./dist/react-voice-input.cjs.js"
-    }
+      "require": "./dist/react-voice-input.cjs.js",
+      "default": "./dist/react-voice-input.es.js"
+    },
+    "./package.json": "./package.json"
   },
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "scripts": {
     "dev": "vite",
