@@ -94,7 +94,15 @@ export default defineConfig(() => ({
   plugins: [
     react(),
     devErrorAndNavigationPlugin(),
-    dts({ insertTypesEntry: true }),
+    dts({
+      insertTypesEntry: true,
+      // Optional: Explicitly specify the entry point for DTS generation if issues persist.
+      // entryRoot: path.resolve(__dirname, "src"), 
+      // Optional: Specify output directory for .d.ts files if it needs to differ or be more explicit.
+      // outputDir: path.resolve(__dirname, "dist/types"), 
+      // Optional: if you want to copy other .d.ts files (e.g. if you had manually created some)
+      // copyDtsFiles: true 
+    }),
   ],
   build: {
     lib: {
