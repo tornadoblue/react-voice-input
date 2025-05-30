@@ -6,6 +6,13 @@
   "main": "./dist/react-voice-input.cjs.js",
   "module": "./dist/react-voice-input.es.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/react-voice-input.es.js",
+      "require": "./dist/react-voice-input.cjs.js"
+    }
+  },
   "files": [
     "dist"
   ],
@@ -61,14 +68,15 @@
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.3",
+    "vite-plugin-dts": "^4.5.4",
     "zod": "^3.23.8"
   },
   "peerDependencies": {
+    "@radix-ui/react-slot": "^1.1.0",
+    "lucide-react": "^0.462.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "lucide-react": "^0.462.0",
-    "sonner": "^1.5.0",
-    "@radix-ui/react-slot": "^1.1.0"
+    "sonner": "^1.5.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",
