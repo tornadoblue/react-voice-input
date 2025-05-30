@@ -18,7 +18,7 @@ const capitalizeFirstLetter = (str: string): string => {
   return str.charAt(0).toUpperCase() + str.slice(1);
 };
 
-const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: number; initialSpeechTimeout?: number }> = ({
+export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
   onSave,
   initialText = "",
   showWaveform = true,
@@ -26,8 +26,8 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
   customWaveformColor,
   placeholder = "Speak or type here...",
   disabled = false,
-  silenceTimeout,
-  initialSpeechTimeout,
+  silenceTimeout, // This comes from VoiceInputCaptureProps now
+  initialSpeechTimeout, // This comes from VoiceInputCaptureProps now
 }) => {
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [interimTranscript, setInterimTranscript] = useState<string>("");
@@ -166,6 +166,7 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
   const handleError = useCallback((error: string) => { 
     console.error(`VIC: handleError. Error: ${error}`);
     setRecordingState("error");
+    setErrorDetails(error); // Set error details to display
     setInterimTranscript("");
     setAudioDataForWaveform(null);
     toast.error(error || "An unknown recording error occurred.", { duration: 5000 });
@@ -191,7 +192,7 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
     });
     return () => {
       console.log("VIC: Cleanup useEffect - Stopping recorder.");
-      speechRecorderRef.current?.stopRecording();
+      speechRecorderRef.current?.stopRecording('manual'); // Ensure stop on unmount
     };
   }, [handleFinalTranscriptSegment, handleInterimTranscript, handleRecordingStart, handleRecordingStop, handleError, handleAudioData, silenceTimeout, initialSpeechTimeout]);
   
@@ -202,33 +203,40 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
       }
     }
   }, [initialText, finalTranscript]);
+
   useEffect(() => { 
     const urlToRevoke = currentAudioUrl;
     return () => {
       if (urlToRevoke) URL.revokeObjectURL(urlToRevoke);
     };
   }, [currentAudioUrl]);
+
   const toggleRecording = async () => { 
     console.log(`VIC: toggleRecording. Current state: ${recordingStateRef.current}`);
     if (disabled) return;
 
     if (recordingStateRef.current === "recording" || recordingStateRef.current === "listening") {
-      speechRecorderRef.current?.stopRecording();
+      speechRecorderRef.current?.stopRecording('manual');
     } else {
       setErrorDetails(null);
       setRecordingState("listening"); 
       await speechRecorderRef.current?.startRecording();
     }
   };
+
   const handleTextDisplaySave = (newText: string) => { 
     setFinalTranscript(newText); 
     onSave(newText, currentAudioBlob, currentAudioUrl); 
     toast.success("Text saved manually!");
   };
+
   const handleRetryError = () => { 
     setErrorDetails(null);
     setRecordingState("idle");
+    // Optionally, immediately try to start recording again or let user click "Start Recording"
+    // For now, just resets to idle.
   };
+
   const getButtonIcon = () => { 
     if (recordingState === "error") return <RotateCcw className="w-5 h-5" />;
     if (recordingState === "recording" || recordingState === "listening") return <StopCircle className="w-5 h-5 text-red-500" />;
@@ -247,7 +255,7 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
       <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
         <Button 
           onClick={recordingState === 'error' ? handleRetryError : toggleRecording} 
-          disabled={disabled} 
+          disabled={disabled && recordingState !== 'error'} // Allow retry even if main component is disabled
           className={cn("flex-shrink-0 w-full sm:w-auto", recordingState === 'error' ? "bg-yellow-500 hover:bg-yellow-600 text-white" : "")}
           aria-label={getButtonText()}
         >
@@ -260,6 +268,8 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
             onTextChange={handleTextDisplaySave} 
             placeholder={placeholder}
             className="w-full"
+            // Pass disabled state to EditableTextDisplay if it should also be disabled
+            // disabled={disabled || isRecordingOrListening} 
           />
         </div>
       </div>
@@ -276,11 +286,9 @@ const VoiceInputCapture: React.FC<VoiceInputCaptureProps & { silenceTimeout?: nu
       {showWaveform && isRecordingOrListening && (
          <WaveformDisplay audioData={audioDataForWaveform} color={customWaveformColor} className="w-full h-16" />
       )}
-      {showWaveform && recordingState === "idle" && !errorDetails && (
+      {showWaveform && recordingState === "idle" && !errorDetails && ( // Show empty waveform when idle and no error
          <WaveformDisplay audioData={null} color={customWaveformColor} className="w-full h-16" />
       )}
     </div>
   );
 };
-
-export default VoiceInputCapture;

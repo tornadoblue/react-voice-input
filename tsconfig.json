@@ -1,19 +1,35 @@
 {
-  "files": [],
-  "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
-  ],
   "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    // "allowImportingTsExtensions": false, // Ensure this is not true if noEmit is false
+    "resolveJsonModule": true,
+    "isolatedModules": true, // Vite requires this, tsc build might not strictly need it but good to keep
+    "noEmit": false, // We want tsc to emit declaration files
+    "jsx": "react-jsx",
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+
+    /* Library specific */
+    "declaration": true,
+    "declarationMap": true,
+    "outDir": "dist",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
-    },
-    "noImplicitAny": false,
-    "noUnusedParameters": false,
-    "skipLibCheck": true,
-    "allowJs": true,
-    "noUnusedLocals": false,
-    "strictNullChecks": false
-  }
+      "@/*": ["src/*"],
+      "react-voice-input": ["src/index.ts"]
+    }
+  },
+  "include": ["src"], // Crucial: Only include the 'src' directory for library compilation
+  "references": [{ "path": "./tsconfig.node.json" }]
 }

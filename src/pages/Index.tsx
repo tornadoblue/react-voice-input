@@ -1,4 +1,4 @@
-import VoiceInputCapture from "@/components/VoiceInputCapture"; 
+import { VoiceInputCapture, VoiceInputCaptureProps } from "react-voice-input"; // Updated import
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,7 +33,7 @@ const Index = () => {
     } catch (error) { console.error("Failed to save recordings:", error); toast.error("Could not save recordings."); }
   }, [recordings]);
 
-  const handleSaveNewRecording = (finalText: string, audioBlob?: Blob | null, audioUrl?: string | null) => {
+  const handleSaveNewRecording: VoiceInputCaptureProps['onSave'] = (finalText, audioBlob, audioUrl) => {
     console.log("Index: Saving new recording. Text:", finalText, "Audio URL:", audioUrl, "Blob exists:", !!audioBlob);
     
     if (!finalText.trim() && !audioBlob) { 
@@ -54,7 +54,14 @@ const Index = () => {
   };
 
   const handleDeleteRecording = (idToDelete: string) => {
-    setRecordings(prev => prev.filter(rec => rec.id !== idToDelete));
+    setRecordings(prev => {
+      const newRecordings = prev.filter(rec => rec.id !== idToDelete);
+      const deletedRecording = prev.find(rec => rec.id === idToDelete);
+      if (deletedRecording?.audioUrl && deletedRecording.audioUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(deletedRecording.audioUrl);
+      }
+      return newRecordings;
+    });
     toast.info("Recording deleted.");
   };
 
@@ -94,6 +101,8 @@ const Index = () => {
             placeholder="Start speaking or type your entry..."
             silenceTimeout={SILENCE_TIMEOUT_MS}
             initialSpeechTimeout={INITIAL_SPEECH_TIMEOUT_MS}
+            showWaveform={true}
+            showInterimTranscript={true}
           />
         </CardContent>
       </Card>

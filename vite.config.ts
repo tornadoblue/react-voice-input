@@ -2,6 +2,7 @@ import { defineConfig, Plugin, HtmlTagDescriptor } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import fs from "fs";
+import dts from "vite-plugin-dts";
 
 export function devErrorAndNavigationPlugin(): Plugin {
   let stacktraceJsContent: string | null = null;
@@ -44,14 +45,13 @@ export function devErrorAndNavigationPlugin(): Plugin {
           dyadShimContent = null;
         }
       } else {
-        console.error(`[dyad-shim] stacktrace.js not found.`);
+        console.error(`[dyad-shim] dyad-shim.js not found.`);
       }
     },
 
     transformIndexHtml(html) {
       const tags: HtmlTagDescriptor[] = [];
 
-      // 1. Inject stacktrace.js
       if (stacktraceJsContent) {
         tags.push({
           tag: "script",
@@ -67,7 +67,6 @@ export function devErrorAndNavigationPlugin(): Plugin {
         });
       }
 
-      // 2. Inject dyad shim
       if (dyadShimContent) {
         tags.push({
           tag: "script",
@@ -92,10 +91,36 @@ export default defineConfig(() => ({
     host: "::",
     port: 8080,
   },
-  plugins: [react(), devErrorAndNavigationPlugin()],
+  plugins: [
+    react(),
+    devErrorAndNavigationPlugin(),
+    dts({ insertTypesEntry: true }),
+  ],
+  build: {
+    lib: {
+      entry: path.resolve(__dirname, "src/index.ts"),
+      name: "ReactVoiceInput", // PascalCase of package name
+      formats: ["es", "cjs", "umd"],
+      fileName: (format) => `react-voice-input.${format}.js`,
+    },
+    rollupOptions: {
+      external: ['react', 'react-dom', 'lucide-react', 'sonner', '@radix-ui/react-slot'],
+      output: {
+        globals: {
+          react: "React",
+          'react-dom': "ReactDOM",
+          'lucide-react': "LucideReact",
+          'sonner': "Sonner",
+          '@radix-ui/react-slot': 'RadixReactSlot'
+        },
+      },
+    },
+    sourcemap: true, // Optional: generate sourcemaps for the library
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "react-voice-input": path.resolve(__dirname, "./src/index.ts"),
     },
   },
 }));
