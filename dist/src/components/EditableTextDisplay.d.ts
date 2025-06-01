@@ -2,6 +2,8 @@ import { default as React } from 'react';
 interface EditableTextDisplayProps {
     initialText: string;
     onTextChange: (newText: string) => void;
+    onEditing: () => void;
+    isEditing: boolean;
     placeholder?: string;
     className?: string;
 }

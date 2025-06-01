@@ -8,7 +8,9 @@ import { VoiceInputCaptureProps, RecordingState } from '@/types';
 import { cn } from '@/lib/utils';
 import { toast } from "sonner";
 import { decodeAudioBlob, findLastSoundEndTime, trimAudioBuffer, audioBufferToWavBlob } from '@/utils/audioUtils';
-import packageJson from '../../package.json'; // RE-INTRODUCING THIS IMPORT
+import packageJson from '../../package.json'; // RE-INTRODUCING THIS IMPORT;
+import { Save } from 'lucide-react';
+
 
 const STOP_COMMAND = "stop recording";
 const MIN_TRAILING_SILENCE_FOR_TRIM_S = 0.75;
@@ -40,15 +42,21 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
   const [currentAudioBlob, setCurrentAudioBlob] = useState<Blob | null>(null);
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
   
+  
   const speechRecorderRef = useRef<EnhancedSpeechRecorder | null>(null);
   const accumulatedFinalTranscriptRef = useRef<string>("");
 
+
+  const [isEditing, setIsEditing] = useState(false);
+  
+  
   const recordingStateRef = useRef(recordingState);
   useEffect(() => {
     recordingStateRef.current = recordingState;
   }, [recordingState]);
 
   const handleFinalTranscriptSegment = useCallback((segment: string) => {
+
     const newSegment = segment.trim();
     if (!newSegment) return;
     let currentText = accumulatedFinalTranscriptRef.current;
@@ -128,6 +136,7 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
   }, [onSave]); 
 
   const handleError = useCallback((error: string) => { 
+    
     setRecordingState("error");
     setErrorDetails(error); 
     setInterimTranscript("");
@@ -235,7 +244,20 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
       )}
 
       <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 pt-4">
-        <Button 
+        <div className="flex-grow w-full">
+          <EditableTextDisplay
+            initialText={interimTranscript || initialText } 
+            onTextChange={setInterimTranscript} 
+            placeholder={placeholder}
+            className="w-full"
+            isEditing={isEditing}
+            onEditing={() => setIsEditing(true)}
+          />
+        </div>
+      </div>
+
+       <div className="flex flex-row items-center justify-between">
+          <Button 
           onClick={recordingState === 'error' ? handleRetryError : toggleRecording} 
           disabled={disabled && recordingState !== 'error'}
           className={cn("flex-shrink-0 w-full sm:w-auto", recordingState === 'error' ? "bg-yellow-500 hover:bg-yellow-600 text-white" : "")}
@@ -244,16 +266,16 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
           {getButtonIcon()}
           <span className="ml-2">{getButtonText()}</span>
         </Button>
-        <div className="flex-grow w-full">
-          <EditableTextDisplay
-            initialText={finalTranscript} 
-            onTextChange={handleTextDisplaySave} 
-            placeholder={placeholder}
-            className="w-full"
-          />
+
+        {isEditing && (
+         <Button onClick={() => handleTextDisplaySave(interimTranscript)} className="flex-shrink-0 w-full sm:w-auto">
+            <Save className="w-4 h-4 mr-2" />
+            Save Text
+        </Button>)}
         </div>
-      </div>
       
+       
+        
       {/* Rest of the JSX remains unchanged */}
       {recordingState === "error" && errorDetails && (
         <div className="flex items-center p-2 text-sm text-destructive-foreground bg-destructive rounded-md">
