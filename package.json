@@ -1,7 +1,7 @@
 {
   "name": "react-voice-input",
   "private": false,
-  "version": "0.1.63",
+  "version": "0.1.64",
   "type": "module",
   "main": "./dist/react-voice-input.cjs.js",
   "module": "./dist/react-voice-input.es.js",
