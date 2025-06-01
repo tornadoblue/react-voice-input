@@ -241,13 +241,22 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
   const handleRetryError = () => { 
     setErrorDetails(null);
     setRecordingState("idle");
-    // Consider re-initializing the recorder on retry if the error might have left it in a bad state
-    // For now, toggleRecording will handle re-initialization if speechRecorderRef.current is null
   };
 
-  const getButtonIcon = () => { /* ... no change ... */ };
-  const getButtonText = () => { /* ... no change ... */ };
   const isRecordingOrListening = recordingState === "recording" || recordingState === "listening";
+
+  const getButtonIcon = () => {
+    if (recordingState === "error") return <RotateCcw className="w-4 h-4" />;
+    if (isRecordingOrListening) return <StopCircle className="w-4 h-4" />;
+    return <Mic className="w-4 h-4" />;
+  };
+
+  const getButtonText = () => {
+    if (recordingState === "error") return "Retry";
+    if (recordingState === "listening") return "Listening...";
+    if (recordingState === "recording") return "Stop Recording";
+    return "Record";
+  };
 
   return ( 
     <div className={cn("p-3 sm:p-4 border rounded-lg shadow-sm bg-card w-full max-w-2xl mx-auto space-y-3", { "opacity-75 cursor-not-allowed": disabled })}>
