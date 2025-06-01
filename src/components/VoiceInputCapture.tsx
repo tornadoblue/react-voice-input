@@ -48,24 +48,180 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
     recordingStateRef.current = recordingState;
   }, [recordingState]);
 
-  // Callbacks remain the same
-  const handleFinalTranscriptSegment = useCallback((segment: string) => { /* ... */ }, []); 
-  const handleInterimTranscript = useCallback((transcript: string) => { /* ... */ }, [showInterimTranscript]);
-  const handleRecordingStart = useCallback(() => { /* ... */ }, []); 
-  const handleRecordingStop = useCallback(async (audioBlob: Blob | null, audioUrl: string | null) => { /* ... */ }, [onSave]); 
-  const handleError = useCallback((error: string) => { /* ... */ }, []); 
-  const handleAudioData = useCallback((dataArray: Uint8Array) => { /* ... */ }, [showWaveform]);
+  const handleFinalTranscriptSegment = useCallback((segment: string) => {
+    const newSegment = segment.trim();
+    if (!newSegment) return;
+    let currentText = accumulatedFinalTranscriptRef.current;
+    if (!currentText) {
+      accumulatedFinalTranscriptRef.current = capitalizeFirstLetter(newSegment);
+    } else {
+      const lastChar = currentText.slice(-1);
+      const endsWithPunctuation = ['.', '!', '?'].includes(lastChar);
+      const endsWithSpace = currentText.endsWith(" ");
+      if (!endsWithPunctuation && !endsWithSpace) currentText += ". "; 
+      else if (endsWithPunctuation && !endsWithSpace) currentText += " "; 
+      accumulatedFinalTranscriptRef.current = currentText + capitalizeFirstLetter(newSegment);
+    }
+    accumulatedFinalTranscriptRef.current = accumulatedFinalTranscriptRef.current.trim();
+    if (recordingStateRef.current === "recording") { 
+      setFinalTranscript(accumulatedFinalTranscriptRef.current);
+    }
+  }, []); 
 
-  useEffect(() => { /* Main ESR setup effect - no changes */ }, [handleFinalTranscriptSegment, handleInterimTranscript, handleRecordingStart, handleRecordingStop, handleError, handleAudioData, silenceTimeout, initialSpeechTimeout]);
-  useEffect(() => { /* initialText effect - no changes */ }, [initialText, finalTranscript]); 
-  useEffect(() => { /* currentAudioUrl cleanup - no changes */ }, [currentAudioUrl]);
+  const handleInterimTranscript = useCallback((transcript: string) => {
+    if (showInterimTranscript) setInterimTranscript(transcript);
+  }, [showInterimTranscript]);
 
-  const toggleRecording = async () => { /* ...no change... */ };
-  const handleTextDisplaySave = (newText: string) => { /* ...no change... */ };
-  const handleRetryError = () => { /* ...no change... */ };
+  const handleRecordingStart = useCallback(() => {
+    setRecordingState("recording");
+    setErrorDetails(null);
+    setInterimTranscript("");
+    accumulatedFinalTranscriptRef.current = ""; 
+    setFinalTranscript(""); 
+    setCurrentAudioBlob(null);
+    setCurrentAudioUrl(prevUrl => {
+      if (prevUrl) URL.revokeObjectURL(prevUrl);
+      return null;
+    });
+  }, []); 
+
+  const handleRecordingStop = useCallback(async (audioBlob: Blob | null, audioUrl: string | null) => {
+    let textFromSpeechSession = accumulatedFinalTranscriptRef.current.trim();
+    if (textFromSpeechSession && !['.', '!', '?'].includes(textFromSpeechSession.slice(-1))) {
+        textFromSpeechSession += ".";
+    }
+    setRecordingState("idle");
+    setInterimTranscript("");
+    let commandDetected = false;
+    let processedAudioBlob = audioBlob;
+    let processedAudioUrl = audioUrl;
+
+    if (textFromSpeechSession.toLowerCase().endsWith(STOP_COMMAND + ".") && audioBlob) { 
+      const commandTextWithPunc = STOP_COMMAND + ".";
+      const commandIndex = textFromSpeechSession.toLowerCase().lastIndexOf(commandTextWithPunc);
+      if (commandIndex === 0 || (commandIndex > 0 && textFromSpeechSession[commandIndex - 1] === ' ')) {
+        textFromSpeechSession = textFromSpeechSession.substring(0, commandIndex).trim();
+        commandDetected = true;
+        const decodedInfo = await decodeAudioBlob(audioBlob);
+        if (decodedInfo) {
+          const soundEndTime = findLastSoundEndTime(decodedInfo.audioBuffer, MIN_TRAILING_SILENCE_FOR_TRIM_S); 
+          if (soundEndTime < decodedInfo.duration - (MIN_TRAILING_SILENCE_FOR_TRIM_S / 2)) {
+            const trimmedBuffer = trimAudioBuffer(decodedInfo.audioBuffer, soundEndTime);
+            if (trimmedBuffer && trimmedBuffer !== decodedInfo.audioBuffer) {
+              const trimmedWavBlob = audioBufferToWavBlob(trimmedBuffer);
+              if (processedAudioUrl) URL.revokeObjectURL(processedAudioUrl); 
+              processedAudioBlob = trimmedWavBlob;
+              processedAudioUrl = URL.createObjectURL(trimmedWavBlob);
+            }
+          }
+        }
+      }
+    }
+    setFinalTranscript(textFromSpeechSession);
+    setCurrentAudioBlob(processedAudioBlob);
+    setCurrentAudioUrl(processedAudioUrl);
+    if (textFromSpeechSession || processedAudioBlob) { 
+      onSave(textFromSpeechSession, processedAudioBlob, processedAudioUrl);
+    } else {
+      if (!commandDetected) setFinalTranscript(""); 
+    }
+  }, [onSave]); 
+
+  const handleError = useCallback((error: string) => { 
+    setRecordingState("error");
+    setErrorDetails(error); 
+    setInterimTranscript("");
+    setAudioDataForWaveform(null);
+    toast.error(error || "An unknown recording error occurred.", { duration: 5000 });
+    accumulatedFinalTranscriptRef.current = "";
+  }, []); 
+
+  const handleAudioData = useCallback((dataArray: Uint8Array) => { 
+    if (showWaveform) {
+      setAudioDataForWaveform(new Uint8Array(dataArray));
+    }
+  }, [showWaveform]);
+
+  useEffect(() => { 
+    const recorder = new EnhancedSpeechRecorder({
+      onFinalTranscript: handleFinalTranscriptSegment,
+      onInterimTranscript: handleInterimTranscript,
+      onRecordingStart: handleRecordingStart,
+      onRecordingStop: handleRecordingStop,
+      onError: handleError,
+      onAudioData: handleAudioData,
+      silenceTimeout: silenceTimeout, 
+      initialSpeechTimeout: initialSpeechTimeout, 
+    });
+    speechRecorderRef.current = recorder;
+    return () => {
+      recorder.dispose(); 
+      speechRecorderRef.current = null; 
+    };
+  }, [handleFinalTranscriptSegment, handleInterimTranscript, handleRecordingStart, handleRecordingStop, handleError, handleAudioData, silenceTimeout, initialSpeechTimeout]);
+  
+  useEffect(() => { 
+    if (recordingStateRef.current !== 'recording' && recordingStateRef.current !== 'listening') {
+      if (initialText !== finalTranscript) {
+        setFinalTranscript(initialText);
+      }
+    }
+  }, [initialText, finalTranscript]); 
+
+  useEffect(() => { 
+    const urlToRevoke = currentAudioUrl;
+    return () => {
+      if (urlToRevoke) {
+        URL.revokeObjectURL(urlToRevoke);
+      }
+    };
+  }, [currentAudioUrl]);
+
+  const toggleRecording = async () => { 
+    if (disabled) return;
+    if (!speechRecorderRef.current) {
+      toast.error("Recorder not ready. Please try again.");
+      return;
+    }
+    if (recordingStateRef.current === "recording" || recordingStateRef.current === "listening") {
+      speechRecorderRef.current.stopRecording('manual');
+    } else {
+      setErrorDetails(null);
+      setRecordingState("listening"); 
+      try {
+        await speechRecorderRef.current.startRecording();
+      } catch (e) {
+        handleError((e as Error).message || "Failed to start recording.");
+        setRecordingState("idle"); 
+      }
+    }
+  };
+
+  const handleTextDisplaySave = (newText: string) => { 
+    setFinalTranscript(newText); 
+    onSave(newText, currentAudioBlob, currentAudioUrl); 
+    toast.success("Text saved manually!");
+  };
+
+  const handleRetryError = () => { 
+    setErrorDetails(null);
+    setRecordingState("idle");
+  };
+
   const isRecordingOrListening = recordingState === "recording" || recordingState === "listening";
-  const getButtonIcon = () => { /* ...no change... */ };
-  const getButtonText = () => { /* ...no change... */ };
+
+  const getButtonIcon = () => {
+    if (recordingState === "error") return <RotateCcw className="w-4 h-4" />;
+    if (isRecordingOrListening) return <StopCircle className="w-4 h-4" />;
+    return <Mic className="w-4 h-4" />;
+  };
+
+  const getButtonText = () => {
+    if (recordingState === "error") return "Retry";
+    if (recordingState === "listening") return "Listening...";
+    if (recordingState === "recording") return "Stop Recording";
+    return "Record";
+  };
 
   // const componentVersion = packageJson.version; // REMOVED for this test
   const componentVersion = "0.1.X (test)"; // Hardcoded for this test
@@ -100,10 +256,22 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
       </div>
       
       {/* Rest of the JSX remains unchanged */}
-      {recordingState === "error" && errorDetails && ( /* ... */ )}
-      {showInterimTranscript && isRecordingOrListening && interimTranscript && ( /* ... */ )}
-      {showWaveform && isRecordingOrListening && ( /* ... */ )}
-      {showWaveform && recordingState === "idle" && !errorDetails && ( /* ... */ )}
+      {recordingState === "error" && errorDetails && (
+        <div className="flex items-center p-2 text-sm text-destructive-foreground bg-destructive rounded-md">
+          <AlertTriangle className="w-4 h-4 mr-2 flex-shrink-0" /> <span>Error: {errorDetails}</span>
+        </div>
+      )}
+      {showInterimTranscript && isRecordingOrListening && interimTranscript && (
+        <div className="p-2 text-sm text-muted-foreground bg-muted/30 rounded-md min-h-[2.5rem] italic">
+          {interimTranscript}
+        </div>
+      )}
+      {showWaveform && isRecordingOrListening && (
+         <WaveformDisplay audioData={audioDataForWaveform} color={customWaveformColor} className="w-full h-16" />
+      )}
+      {showWaveform && recordingState === "idle" && !errorDetails && ( 
+         <WaveformDisplay audioData={null} color={customWaveformColor} className="w-full h-16" />
+      )}
     </div>
   );
 };
