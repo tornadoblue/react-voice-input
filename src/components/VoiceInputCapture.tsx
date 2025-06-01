@@ -165,8 +165,13 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
   }, []);
 
   const handleAudioData = useCallback((dataArray: Uint8Array) => { 
+    // console.log("VIC: handleAudioData received, showWaveform:", showWaveform, "dataArray length:", dataArray?.length); // Can be noisy
+    if (dataArray && dataArray.length > 0) {
+      // const isFlat = dataArray.every(val => val === 128);
+      // console.log("VIC: handleAudioData - dataArray[0]:", dataArray[0], "isFlat:", isFlat); // Can be noisy
+    }
     if (showWaveform) {
-      setAudioDataForWaveform(new Uint8Array(dataArray));
+      setAudioDataForWaveform(new Uint8Array(dataArray)); // Create a new instance for React state update
     }
   }, [showWaveform]);
 

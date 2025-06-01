@@ -148,8 +148,79 @@ class EnhancedSpeechRecorder {
   private clearInitialSpeechTimer() { /* ... no change ... */ }
   private resetSilenceTimer() { /* ... no change ... */ }
   private clearSilenceTimer() { /* ... no change ... */ }
-  private setupMediaRecorder(stream: MediaStream) { /* ... no change ... */ }
-  private drawWaveform = () => { /* ... no change ... */ }
+
+  private setupMediaRecorder(stream: MediaStream) {
+    try {
+      this.mediaRecorder = new MediaRecorder(stream);
+      this.audioChunks = [];
+
+      this.mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          this.audioChunks.push(event.data);
+        }
+      };
+
+      this.mediaRecorder.onstop = () => {
+        console.log("ESR: mediaRecorder.onstop. Reason for stop:", this.stopReason);
+        const audioBlob = this.audioChunks.length > 0 ? new Blob(this.audioChunks, { type: this.audioChunks[0]?.type || 'audio/webm' }) : null;
+        const audioUrl = audioBlob ? URL.createObjectURL(audioBlob) : null;
+        
+        this.options.onRecordingStop(audioBlob, audioUrl);
+        
+        this.cleanupAudioProcessing(); 
+        this.audioChunks = [];
+        // this.isManuallyStopping = false; // Moved to startRecording
+      };
+
+      this.mediaRecorder.onerror = (event) => {
+        console.error("ESR: MediaRecorder error", event);
+        this.options.onError("MediaRecorder error.");
+        this.stopRecordingInternal('error'); 
+      };
+
+    } catch (error) {
+        console.error("ESR: Error setting up MediaRecorder:", error);
+        this.options.onError("Failed to set up audio recording.");
+        return;
+    }
+
+    try {
+        this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        this.analyserNode = this.audioContext.createAnalyser();
+        this.analyserNode.fftSize = 2048; // Common size
+        const bufferLength = this.analyserNode.frequencyBinCount;
+        this.dataArray = new Uint8Array(bufferLength);
+
+        this.sourceNode = this.audioContext.createMediaStreamSource(stream);
+        this.sourceNode.connect(this.analyserNode);
+        console.log("ESR: Web Audio API setup complete for waveform. Starting drawWaveform loop.");
+        this.drawWaveform(); // Start the drawing loop
+    } catch (error) {
+        console.error("ESR: Error setting up Web Audio API for waveform:", error);
+        // Not calling options.onError here as waveform is secondary to recording itself
+    }
+  }
+  
+  private drawWaveform = () => {
+    if (this.analyserNode && this.dataArray && this.mediaRecorder?.state === 'recording') {
+      this.analyserNode.getByteTimeDomainData(this.dataArray);
+      // console.log("ESR: drawWaveform - mediaRecorder.state:", this.mediaRecorder?.state); // Repetitive
+      if (this.dataArray.length > 0) {
+          const isFlat = this.dataArray.every(val => val === 128); 
+          // console.log("ESR: drawWaveform - dataArray[0]:", this.dataArray[0], "isFlat:", isFlat, "length:", this.dataArray.length); // Too noisy
+      }
+      this.options.onAudioData(this.dataArray); // Pass a copy
+      this.animationFrameId = requestAnimationFrame(this.drawWaveform);
+    } else {
+      // console.log("ESR: drawWaveform loop stopping. Analyser:", !!this.analyserNode, "DataArray:", !!this.dataArray, "MediaRecorder State:", this.mediaRecorder?.state);
+      if (this.animationFrameId) {
+        cancelAnimationFrame(this.animationFrameId);
+        this.animationFrameId = null;
+      }
+      // Send one last empty array to clear waveform if it was abruptly stopped
+      // this.options.onAudioData(new Uint8Array(this.dataArray?.length || 256).fill(128));
+    }
+  };
   
   private cleanupAudioProcessing = () => {
     if (this.animationFrameId) {
@@ -283,6 +354,7 @@ class EnhancedSpeechRecorder {
         this.cleanupAudioProcessing(); // Ensure full audio cleanup on dispose
     } else if (this.mediaRecorder && this.mediaRecorder.state === "inactive") {
         // If not disposing and media recorder is already inactive, ensure audio visualization is cleaned up.
+        // This is important because drawWaveform loop condition depends on mediaRecorder.state
         this.cleanupAudioProcessing();
     }
   }
