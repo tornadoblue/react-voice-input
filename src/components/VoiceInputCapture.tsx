@@ -1,15 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from "@/components/ui/button";
-import { Mic, StopCircle, AlertTriangle, RotateCcw, Info } from 'lucide-react'; // Added Info icon
+import { Mic, StopCircle, AlertTriangle, RotateCcw } from 'lucide-react';
 import EditableTextDisplay from './EditableTextDisplay';
 import WaveformDisplay from './WaveformDisplay';
 import EnhancedSpeechRecorder from '@/services/EnhancedSpeechRecorder';
-import { VoiceInputCaptureProps, RecordingState } from '@/types';
+import { VoiceInputCaptureProps, RecordingState } from '@/types'; // Will still have showVersionInfo, but component won't use it
 import { cn } from '@/lib/utils';
 import { toast } from "sonner";
 import { decodeAudioBlob, findLastSoundEndTime, trimAudioBuffer, audioBufferToWavBlob } from '@/utils/audioUtils';
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"; // Added Tooltip
-import packageJson from '../../package.json'; // Import version from package.json
 
 const STOP_COMMAND = "stop recording";
 const MIN_TRAILING_SILENCE_FOR_TRIM_S = 0.75;
@@ -31,7 +29,7 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
   disabled = false,
   silenceTimeout = DEFAULT_VIC_SILENCE_TIMEOUT,
   initialSpeechTimeout = DEFAULT_VIC_INITIAL_SPEECH_TIMEOUT,
-  showVersionInfo = true, // Default to true
+  // showVersionInfo prop is defined in types but not used here for now
 }) => {
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [interimTranscript, setInterimTranscript] = useState<string>("");
@@ -49,15 +47,101 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
     recordingStateRef.current = recordingState;
   }, [recordingState]);
 
-  const handleFinalTranscriptSegment = useCallback((segment: string) => { /* ... no changes ... */ }, []);
-  const handleInterimTranscript = useCallback((transcript: string) => { /* ... no changes ... */ }, [showInterimTranscript]);
-  const handleRecordingStart = useCallback(() => { /* ... no changes ... */ }, []);
-  const handleRecordingStop = useCallback(async (audioBlob: Blob | null, audioUrl: string | null) => { /* ... no changes ... */ }, [onSave]);
-  const handleError = useCallback((error: string) => { /* ... no changes ... */ }, []);
-  const handleAudioData = useCallback((dataArray: Uint8Array) => { /* ... no changes ... */ }, [showWaveform]);
+  const handleFinalTranscriptSegment = useCallback((segment: string) => {
+    const newSegment = segment.trim();
+    if (!newSegment) return;
+    let currentText = accumulatedFinalTranscriptRef.current;
+    if (!currentText) {
+      accumulatedFinalTranscriptRef.current = capitalizeFirstLetter(newSegment);
+    } else {
+      const lastChar = currentText.slice(-1);
+      const endsWithPunctuation = ['.', '!', '?'].includes(lastChar);
+      const endsWithSpace = currentText.endsWith(" ");
+      if (!endsWithPunctuation && !endsWithSpace) currentText += ". "; 
+      else if (endsWithPunctuation && !endsWithSpace) currentText += " "; 
+      accumulatedFinalTranscriptRef.current = currentText + capitalizeFirstLetter(newSegment);
+    }
+    accumulatedFinalTranscriptRef.current = accumulatedFinalTranscriptRef.current.trim();
+    if (recordingStateRef.current === "recording") { 
+      setFinalTranscript(accumulatedFinalTranscriptRef.current);
+    }
+  }, []); 
+
+  const handleInterimTranscript = useCallback((transcript: string) => {
+    if (showInterimTranscript) setInterimTranscript(transcript);
+  }, [showInterimTranscript]);
+
+  const handleRecordingStart = useCallback(() => {
+    setRecordingState("recording");
+    setErrorDetails(null);
+    setInterimTranscript("");
+    accumulatedFinalTranscriptRef.current = ""; 
+    setFinalTranscript(""); 
+    setCurrentAudioBlob(null);
+    setCurrentAudioUrl(prevUrl => {
+      if (prevUrl) URL.revokeObjectURL(prevUrl);
+      return null;
+    });
+  }, []); 
+
+  const handleRecordingStop = useCallback(async (audioBlob: Blob | null, audioUrl: string | null) => {
+    let textFromSpeechSession = accumulatedFinalTranscriptRef.current.trim();
+    if (textFromSpeechSession && !['.', '!', '?'].includes(textFromSpeechSession.slice(-1))) {
+        textFromSpeechSession += ".";
+    }
+    setRecordingState("idle");
+    setInterimTranscript("");
+    let commandDetected = false;
+    let processedAudioBlob = audioBlob;
+    let processedAudioUrl = audioUrl;
+
+    if (textFromSpeechSession.toLowerCase().endsWith(STOP_COMMAND + ".") && audioBlob) { 
+      const commandTextWithPunc = STOP_COMMAND + ".";
+      const commandIndex = textFromSpeechSession.toLowerCase().lastIndexOf(commandTextWithPunc);
+      if (commandIndex === 0 || (commandIndex > 0 && textFromSpeechSession[commandIndex - 1] === ' ')) {
+        textFromSpeechSession = textFromSpeechSession.substring(0, commandIndex).trim();
+        commandDetected = true;
+        const decodedInfo = await decodeAudioBlob(audioBlob);
+        if (decodedInfo) {
+          const soundEndTime = findLastSoundEndTime(decodedInfo.audioBuffer, MIN_TRAILING_SILENCE_FOR_TRIM_S); 
+          if (soundEndTime < decodedInfo.duration - (MIN_TRAILING_SILENCE_FOR_TRIM_S / 2)) {
+            const trimmedBuffer = trimAudioBuffer(decodedInfo.audioBuffer, soundEndTime);
+            if (trimmedBuffer && trimmedBuffer !== decodedInfo.audioBuffer) {
+              const trimmedWavBlob = audioBufferToWavBlob(trimmedBuffer);
+              if (processedAudioUrl) URL.revokeObjectURL(processedAudioUrl); 
+              processedAudioBlob = trimmedWavBlob;
+              processedAudioUrl = URL.createObjectURL(trimmedWavBlob);
+            }
+          }
+        }
+      }
+    }
+    setFinalTranscript(textFromSpeechSession);
+    setCurrentAudioBlob(processedAudioBlob);
+    setCurrentAudioUrl(processedAudioUrl);
+    if (textFromSpeechSession || processedAudioBlob) { 
+      onSave(textFromSpeechSession, processedAudioBlob, processedAudioUrl);
+    } else {
+      if (!commandDetected) setFinalTranscript(""); 
+    }
+  }, [onSave]); 
+
+  const handleError = useCallback((error: string) => { 
+    setRecordingState("error");
+    setErrorDetails(error); 
+    setInterimTranscript("");
+    setAudioDataForWaveform(null);
+    toast.error(error || "An unknown recording error occurred.", { duration: 5000 });
+    accumulatedFinalTranscriptRef.current = "";
+  }, []); 
+
+  const handleAudioData = useCallback((dataArray: Uint8Array) => { 
+    if (showWaveform) {
+      setAudioDataForWaveform(new Uint8Array(dataArray));
+    }
+  }, [showWaveform]);
 
   useEffect(() => { 
-    // console.log("VIC: Main useEffect for ESR setup. Silence:", silenceTimeout, "Initial:", initialSpeechTimeout);
     const recorder = new EnhancedSpeechRecorder({
       onFinalTranscript: handleFinalTranscriptSegment,
       onInterimTranscript: handleInterimTranscript,
@@ -70,41 +154,77 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
     });
     speechRecorderRef.current = recorder;
     return () => {
-      // console.log("VIC: Main useEffect cleanup - Disposing recorder.");
       recorder.dispose(); 
       speechRecorderRef.current = null; 
     };
   }, [handleFinalTranscriptSegment, handleInterimTranscript, handleRecordingStart, handleRecordingStop, handleError, handleAudioData, silenceTimeout, initialSpeechTimeout]);
   
-  useEffect(() => { /* ... no changes ... */ }, [initialText, finalTranscript]);
-  useEffect(() => { /* ... no changes ... */ }, [currentAudioUrl]);
+  useEffect(() => { 
+    if (recordingStateRef.current !== 'recording' && recordingStateRef.current !== 'listening') {
+      if (initialText !== finalTranscript) {
+        setFinalTranscript(initialText);
+      }
+    }
+  }, [initialText, finalTranscript]); 
 
-  const toggleRecording = async () => { /* ... no changes ... */ };
-  const handleTextDisplaySave = (newText: string) => { /* ... no changes ... */ };
-  const handleRetryError = () => { /* ... no changes ... */ };
+  useEffect(() => { 
+    const urlToRevoke = currentAudioUrl;
+    return () => {
+      if (urlToRevoke) {
+        URL.revokeObjectURL(urlToRevoke);
+      }
+    };
+  }, [currentAudioUrl]);
+
+  const toggleRecording = async () => { 
+    if (disabled) return;
+    if (!speechRecorderRef.current) {
+      toast.error("Recorder not ready. Please try again.");
+      return;
+    }
+    if (recordingStateRef.current === "recording" || recordingStateRef.current === "listening") {
+      speechRecorderRef.current.stopRecording('manual');
+    } else {
+      setErrorDetails(null);
+      setRecordingState("listening"); 
+      try {
+        await speechRecorderRef.current.startRecording();
+      } catch (e) {
+        handleError((e as Error).message || "Failed to start recording.");
+        setRecordingState("idle"); 
+      }
+    }
+  };
+
+  const handleTextDisplaySave = (newText: string) => { 
+    setFinalTranscript(newText); 
+    onSave(newText, currentAudioBlob, currentAudioUrl); 
+    toast.success("Text saved manually!");
+  };
+
+  const handleRetryError = () => { 
+    setErrorDetails(null);
+    setRecordingState("idle");
+  };
 
   const isRecordingOrListening = recordingState === "recording" || recordingState === "listening";
-  const getButtonIcon = () => { /* ... no changes ... */ };
-  const getButtonText = () => { /* ... no changes ... */ };
 
-  const componentVersion = packageJson.version;
+  const getButtonIcon = () => {
+    if (recordingState === "error") return <RotateCcw className="w-4 h-4" />;
+    if (isRecordingOrListening) return <StopCircle className="w-4 h-4" />;
+    return <Mic className="w-4 h-4" />;
+  };
+
+  const getButtonText = () => {
+    if (recordingState === "error") return "Retry";
+    if (recordingState === "listening") return "Listening...";
+    if (recordingState === "recording") return "Stop Recording";
+    return "Record";
+  };
 
   return ( 
-    <div className={cn("relative p-3 sm:p-4 border rounded-lg shadow-sm bg-card w-full max-w-2xl mx-auto space-y-3", { "opacity-75 cursor-not-allowed": disabled })}>
-      {showVersionInfo && componentVersion && (
-        <div className="absolute top-2 right-2">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Info className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Version: {componentVersion}</p>
-            </TooltipContent>
-          </Tooltip>
-        </div>
-      )}
-
-      <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 pt-4"> {/* Added pt-4 for spacing if version info is present */}
+    <div className={cn("p-3 sm:p-4 border rounded-lg shadow-sm bg-card w-full max-w-2xl mx-auto space-y-3", { "opacity-75 cursor-not-allowed": disabled })}>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
         <Button 
           onClick={recordingState === 'error' ? handleRetryError : toggleRecording} 
           disabled={disabled && recordingState !== 'error'}
