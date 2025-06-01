@@ -7,7 +7,7 @@ A reusable React voice input component for capturing audio and transcribing spee
 
 ## Version
 
-0.1.0
+0.1.65
 
 ## Installation
 
