@@ -133,7 +133,7 @@ class EnhancedSpeechRecorder {
         this.cleanupAudioProcessing(); 
         this.audioChunks = [];
       };
-      this.mediaRecorder.onerror = (e) => { this.options.onError("MediaRecorder error."); this.stopRecordingInternal('error'); };
+      this.mediaRecorder.onerror = (_e) => { this.options.onError("MediaRecorder error."); this.stopRecordingInternal('error'); }; // Changed e to _e
       
       // Start MediaRecorder and immediately log its state
       this.mediaRecorder.start();
@@ -182,13 +182,13 @@ class EnhancedSpeechRecorder {
     }
   };
 
-  private cleanupAudioProcessing = () => { /* ... no changes from previous valid step ... */ 
+  private cleanupAudioProcessing = () => { 
     if (this.animationFrameId) { cancelAnimationFrame(this.animationFrameId); this.animationFrameId = null; }
     if (this.audioContext && this.audioContext.state !== 'closed') {
-        if (this.sourceNode) { try { this.sourceNode.disconnect(); } catch(e) {} }
+        if (this.sourceNode) { try { this.sourceNode.disconnect(); } catch(_e) {} } // Changed e to _e if you want to be consistent, though not strictly necessary for an empty catch
     }
     this.sourceNode = null; this.analyserNode = null; 
-    if (this.audioContext && this.audioContext.state !== 'closed') { this.audioContext.close().catch(e => {}); }
+    if (this.audioContext && this.audioContext.state !== 'closed') { this.audioContext.close().catch(_e => {}); } // Changed e to _e
     this.audioContext = null; this.dataArray = null;
   };
 
