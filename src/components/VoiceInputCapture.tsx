@@ -48,7 +48,6 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
     recordingStateRef.current = recordingState;
   }, [recordingState]);
 
-  // Callbacks are complete and correct from previous step
   const handleFinalTranscriptSegment = useCallback((segment: string) => {
     const newSegment = segment.trim();
     if (!newSegment) return;
@@ -143,16 +142,86 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
     }
   }, [showWaveform]);
 
-  useEffect(() => { /* Main ESR setup effect - no changes */ }, [handleFinalTranscriptSegment, handleInterimTranscript, handleRecordingStart, handleRecordingStop, handleError, handleAudioData, silenceTimeout, initialSpeechTimeout]);
-  useEffect(() => { /* initialText effect - no changes */ }, [initialText, finalTranscript]); 
-  useEffect(() => { /* currentAudioUrl cleanup - no changes */ }, [currentAudioUrl]);
+  useEffect(() => { 
+    const recorder = new EnhancedSpeechRecorder({
+      onFinalTranscript: handleFinalTranscriptSegment,
+      onInterimTranscript: handleInterimTranscript,
+      onRecordingStart: handleRecordingStart,
+      onRecordingStop: handleRecordingStop,
+      onError: handleError,
+      onAudioData: handleAudioData,
+      silenceTimeout: silenceTimeout, 
+      initialSpeechTimeout: initialSpeechTimeout, 
+    });
+    speechRecorderRef.current = recorder;
+    return () => {
+      recorder.dispose(); 
+      speechRecorderRef.current = null; 
+    };
+  }, [handleFinalTranscriptSegment, handleInterimTranscript, handleRecordingStart, handleRecordingStop, handleError, handleAudioData, silenceTimeout, initialSpeechTimeout]);
+  
+  useEffect(() => { 
+    if (recordingStateRef.current !== 'recording' && recordingStateRef.current !== 'listening') {
+      if (initialText !== finalTranscript) {
+        setFinalTranscript(initialText);
+      }
+    }
+  }, [initialText, finalTranscript]); 
 
-  const toggleRecording = async () => { /* ...no change... */ };
-  const handleTextDisplaySave = (newText: string) => { /* ...no change... */ };
-  const handleRetryError = () => { /* ...no change... */ };
+  useEffect(() => { 
+    const urlToRevoke = currentAudioUrl;
+    return () => {
+      if (urlToRevoke) {
+        URL.revokeObjectURL(urlToRevoke);
+      }
+    };
+  }, [currentAudioUrl]);
+
+  const toggleRecording = async () => { 
+    if (disabled) return;
+    if (!speechRecorderRef.current) {
+      toast.error("Recorder not ready. Please try again.");
+      return;
+    }
+    if (recordingStateRef.current === "recording" || recordingStateRef.current === "listening") {
+      speechRecorderRef.current.stopRecording('manual');
+    } else {
+      setErrorDetails(null);
+      setRecordingState("listening"); 
+      try {
+        await speechRecorderRef.current.startRecording();
+      } catch (e) {
+        handleError((e as Error).message || "Failed to start recording.");
+        setRecordingState("idle"); 
+      }
+    }
+  };
+
+  const handleTextDisplaySave = (newText: string) => { 
+    setFinalTranscript(newText); 
+    onSave(newText, currentAudioBlob, currentAudioUrl); 
+    toast.success("Text saved manually!");
+  };
+
+  const handleRetryError = () => { 
+    setErrorDetails(null);
+    setRecordingState("idle");
+  };
+
   const isRecordingOrListening = recordingState === "recording" || recordingState === "listening";
-  const getButtonIcon = () => { /* ...no change... */ };
-  const getButtonText = () => { /* ...no change... */ };
+
+  const getButtonIcon = () => {
+    if (recordingState === "error") return <RotateCcw className="w-4 h-4" />;
+    if (isRecordingOrListening) return <StopCircle className="w-4 h-4" />;
+    return <Mic className="w-4 h-4" />;
+  };
+
+  const getButtonText = () => {
+    if (recordingState === "error") return "Retry";
+    if (recordingState === "listening") return "Listening...";
+    if (recordingState === "recording") return "Stop Recording";
+    return "Record";
+  };
 
   const componentVersion = packageJson.version; // Using imported packageJson
 
@@ -186,10 +255,22 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
       </div>
       
       {/* Rest of the JSX remains unchanged */}
-      {recordingState === "error" && errorDetails && ( /* ... */ )}
-      {showInterimTranscript && isRecordingOrListening && interimTranscript && ( /* ... */ )}
-      {showWaveform && isRecordingOrListening && ( /* ... */ )}
-      {showWaveform && recordingState === "idle" && !errorDetails && ( /* ... */ )}
+      {recordingState === "error" && errorDetails && (
+        <div className="flex items-center p-2 text-sm text-destructive-foreground bg-destructive rounded-md">
+          <AlertTriangle className="w-4 h-4 mr-2 flex-shrink-0" /> <span>Error: {errorDetails}</span>
+        </div>
+      )}
+      {showInterimTranscript && isRecordingOrListening && interimTranscript && (
+        <div className="p-2 text-sm text-muted-foreground bg-muted/30 rounded-md min-h-[2.5rem] italic">
+          {interimTranscript}
+        </div>
+      )}
+      {showWaveform && isRecordingOrListening && (
+         <WaveformDisplay audioData={audioDataForWaveform} color={customWaveformColor} className="w-full h-16" />
+      )}
+      {showWaveform && recordingState === "idle" && !errorDetails && ( 
+         <WaveformDisplay audioData={null} color={customWaveformColor} className="w-full h-16" />
+      )}
     </div>
   );
 };
