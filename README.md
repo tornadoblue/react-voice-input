@@ -71,7 +71,7 @@ function App() {
       <VoiceInputCapture
         onSave={handleSave}
         initialText=""
-        placeholder="Start speaking or type your note..."
+        // placeholder defaults to "Press Record button to start the dictation, or type here..."
         silenceTimeout={3000}      // Optional: milliseconds of silence before auto-stopping
         initialSpeechTimeout={5000} // Optional: milliseconds to wait for speech before timing out
         textDisplayClassName="text-xl font-serif" // Example: Make text area larger and serif
@@ -102,7 +102,7 @@ The `VoiceInputCapture` component accepts the following props:
 | ---------------------------- | ----------------------------------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------- |
 | `onSave`                     | `(text: string, audioBlob: Blob \| null, audioUrl: string \| null) => void` | **Required**                   | Callback function triggered when recording stops (due to silence, manual stop, or error with content).     |
 | `initialText`                | `string`                                                          | `""`                           | Initial text to display in the text area.                                                                  |
-| `placeholder`                | `string`                                                          | `"Speak or type here..."`      | Placeholder text for the text area.                                                                        |
+| `placeholder`                | `string`                                                          | `"Press Record button to start the dictation, or type here..."`      | Placeholder text for the text area.                                                                        |
 | `showWaveform`               | `boolean`                                                         | `true`                         | Whether to display the audio waveform during recording.                                                    |
 | `showInterimTranscript`      | `boolean`                                                         | `true`                         | Whether to display the interim (real-time) speech-to-text transcript.                                      |
 | `customWaveformColor`        | `string`                                                          | `"#3b82f6"` (Tailwind blue-500) | Custom color for the waveform.                                                                             |

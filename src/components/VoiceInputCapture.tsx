@@ -26,7 +26,7 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
   showWaveform = true,
   showInterimTranscript = true,
   customWaveformColor,
-  placeholder = "Speak or type here...",
+  placeholder = "Press Record button to start the dictation, or type here...", // Updated default placeholder
   disabled = false,
   silenceTimeout = DEFAULT_VIC_SILENCE_TIMEOUT,
   initialSpeechTimeout = DEFAULT_VIC_INITIAL_SPEECH_TIMEOUT,

@@ -21,7 +21,8 @@ const DEFAULT_SILENCE_TIMEOUT_MS = 3000;
 const DEFAULT_INITIAL_SPEECH_TIMEOUT_MS = 5000; 
 const DEFAULT_WAVEFORM_COLOR = "#3b82f6"; // blue-500
 const DEFAULT_RECORD_BUTTON_STYLE = "bg-white hover:bg-red-50 text-red-600 border-2 border-red-500 dark:bg-gray-950 dark:hover:bg-red-900/20 dark:text-red-500 dark:border-red-700";
-const DEFAULT_INTERIM_TEXT_STYLE = "text-xl text-blue-700"; // New default: extra large and dark blue
+const DEFAULT_INTERIM_TEXT_STYLE = "text-xl text-blue-700"; 
+const NEW_DEFAULT_PLACEHOLDER = "Press Record button to start the dictation, or type here...";
 
 const Index = () => {
   const [recordings, setRecordings] = useState<Recording[]>([]);
@@ -60,11 +61,11 @@ const Index = () => {
   ];
 
   const interimStyleOptions = [
-    { value: DEFAULT_INTERIM_TEXT_STYLE, label: 'Default (XL, Dark Blue)' }, // Updated default label
+    { value: DEFAULT_INTERIM_TEXT_STYLE, label: 'Default (XL, Dark Blue)' }, 
     { value: 'text-sm italic', label: 'Small, Italic (Old Default)' },
     { value: 'text-xs italic text-gray-500', label: 'X-Small, Italic, Gray' },
     { value: 'text-base font-medium', label: 'Base, Medium Weight' },
-    { value: 'text-lg text-purple-500', label: 'Large, Purple' }, // Changed one option for variety
+    { value: 'text-lg text-purple-500', label: 'Large, Purple' }, 
   ];
 
 
@@ -244,7 +245,7 @@ const Index = () => {
             key={captureKey} 
             onSave={handleSaveNewRecording}
             initialText="" 
-            placeholder="Start speaking or type your entry..."
+            placeholder={NEW_DEFAULT_PLACEHOLDER} // Use the new default placeholder
             customWaveformColor={waveformColor}
             textDisplayClassName={textStyle}
             interimTranscriptClassName={interimTextStyle}
