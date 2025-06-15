@@ -20,8 +20,8 @@ const LOCAL_STORAGE_KEY = "voiceRecordings";
 const DEFAULT_SILENCE_TIMEOUT_MS = 3000; 
 const DEFAULT_INITIAL_SPEECH_TIMEOUT_MS = 5000; 
 const DEFAULT_WAVEFORM_COLOR = "#3b82f6"; // blue-500
-// Updated default style for the record button for better readability
-const DEFAULT_RECORD_BUTTON_STYLE = "bg-white hover:bg-red-50 text-red-600 border border-red-500 dark:bg-gray-950 dark:hover:bg-red-900/20 dark:text-red-500 dark:border-red-700";
+// Updated default style for the record button
+const DEFAULT_RECORD_BUTTON_STYLE = "bg-white hover:bg-red-50 text-red-100 border border-red-500 border-2 dark:bg-gray-950 dark:hover:bg-red-200/20 dark:text-red-500 dark:border-red-700";
 
 const Index = () => {
   const [recordings, setRecordings] = useState<Recording[]>([]);
