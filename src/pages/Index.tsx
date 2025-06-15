@@ -3,7 +3,11 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Trash2, Settings } from "lucide-react";
 
 interface Recording {
   id: string;
@@ -13,12 +17,31 @@ interface Recording {
 }
 
 const LOCAL_STORAGE_KEY = "voiceRecordings";
-const SILENCE_TIMEOUT_MS = 3000; 
-const INITIAL_SPEECH_TIMEOUT_MS = 5000; 
+// Default values from VoiceInputCapture component for initial state
+const DEFAULT_SILENCE_TIMEOUT_MS = 3000; 
+const DEFAULT_INITIAL_SPEECH_TIMEOUT_MS = 5000; 
+const DEFAULT_WAVEFORM_COLOR = "#3b82f6"; // blue-500
 
 const Index = () => {
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [captureKey, setCaptureKey] = useState<number>(0); 
+
+  // State for controllable props
+  const [waveformColor, setWaveformColor] = useState<string>(DEFAULT_WAVEFORM_COLOR);
+  const [textStyle, setTextStyle] = useState<string>('text-lg'); // Default style in EditableTextDisplay
+  const [silenceTime, setSilenceTime] = useState<number>(DEFAULT_SILENCE_TIMEOUT_MS);
+  const [initialTime, setInitialTime] = useState<number>(DEFAULT_INITIAL_SPEECH_TIMEOUT_MS);
+  const [doShowWaveform, setDoShowWaveform] = useState<boolean>(true);
+  const [doShowInterim, setDoShowInterim] = useState<boolean>(true);
+  const [doShowVersion, setDoShowVersion] = useState<boolean>(true);
+
+  const textStyleOptions = [
+    { value: 'text-lg', label: 'Default (lg)' },
+    { value: 'text-xl', label: 'Large (xl)' },
+    { value: 'text-2xl font-semibold', label: 'X-Large (2xl) Semibold' },
+    { value: 'text-lg italic', label: 'Default Italic (lg)' },
+    { value: 'text-sm', label: 'Small (sm)' },
+  ];
 
   useEffect(() => {
     try {
@@ -86,6 +109,81 @@ const Index = () => {
         </p>
       </header>
 
+      {/* Settings Card */}
+      <Card className="w-full max-w-2xl mx-auto">
+        <CardHeader>
+          <CardTitle className="flex items-center"><Settings className="w-5 h-5 mr-2" /> Component Settings</CardTitle>
+          <CardDescription>Adjust the properties of the VoiceInputCapture component below.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+            <div>
+              <Label htmlFor="waveformColor">Waveform Color</Label>
+              <Input 
+                id="waveformColor" 
+                value={waveformColor} 
+                onChange={(e) => setWaveformColor(e.target.value)} 
+                placeholder={DEFAULT_WAVEFORM_COLOR} 
+              />
+            </div>
+            <div>
+              <Label htmlFor="textStyle">Text Area Style</Label>
+              <Select onValueChange={setTextStyle} defaultValue={textStyle}>
+                <SelectTrigger id="textStyle">
+                  <SelectValue placeholder="Select style" />
+                </SelectTrigger>
+                <SelectContent>
+                  {textStyleOptions.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+            <div>
+              <Label htmlFor="silenceTimeout">Silence Timeout (ms)</Label>
+              <Input 
+                id="silenceTimeout" 
+                type="number" 
+                value={silenceTime} 
+                onChange={(e) => setSilenceTime(Number(e.target.value))} 
+                step={100}
+                placeholder={String(DEFAULT_SILENCE_TIMEOUT_MS)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="initialSpeechTimeout">Initial Speech Timeout (ms)</Label>
+              <Input 
+                id="initialSpeechTimeout" 
+                type="number" 
+                value={initialTime} 
+                onChange={(e) => setInitialTime(Number(e.target.value))} 
+                step={100}
+                placeholder={String(DEFAULT_INITIAL_SPEECH_TIMEOUT_MS)}
+              />
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+            <div className="flex items-center space-x-2">
+              <Switch id="showWaveform" checked={doShowWaveform} onCheckedChange={setDoShowWaveform} />
+              <Label htmlFor="showWaveform">Show Waveform</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Switch id="showInterimTranscript" checked={doShowInterim} onCheckedChange={setDoShowInterim} />
+              <Label htmlFor="showInterimTranscript">Show Interim Transcript</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Switch id="showVersionInfo" checked={doShowVersion} onCheckedChange={setDoShowVersion} />
+              <Label htmlFor="showVersionInfo">Show Version Info</Label>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Voice Input Card */}
       <Card className="w-full max-w-2xl mx-auto">
         <CardHeader>
           <CardTitle>New Entry</CardTitle>
@@ -99,15 +197,19 @@ const Index = () => {
             onSave={handleSaveNewRecording}
             initialText="" 
             placeholder="Start speaking or type your entry..."
-            silenceTimeout={SILENCE_TIMEOUT_MS}
-            initialSpeechTimeout={INITIAL_SPEECH_TIMEOUT_MS}
-            showWaveform={true}
-            showInterimTranscript={true} // This controls the separate interim display
-            showVersionInfo={true} // Assuming you want to keep this
+            // Pass controllable props
+            customWaveformColor={waveformColor}
+            textDisplayClassName={textStyle}
+            silenceTimeout={silenceTime}
+            initialSpeechTimeout={initialTime}
+            showWaveform={doShowWaveform}
+            showInterimTranscript={doShowInterim}
+            showVersionInfo={doShowVersion}
           />
         </CardContent>
       </Card>
 
+      {/* Recordings List Card */}
       {recordings.length > 0 && (
         <Card className="w-full max-w-2xl mx-auto">
           <CardHeader className="flex flex-row items-center justify-between">
