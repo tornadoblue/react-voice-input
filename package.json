@@ -1,4 +1,29 @@
 {
+  "name": "react-voice-input",
+  "version": "0.1.65",
+  "description": "A reusable React voice input component for capturing audio and transcribing speech.",
+  "main": "./dist/react-voice-input.umd.js",
+  "module": "./dist/react-voice-input.es.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/react-voice-input.es.js",
+      "require": "./dist/react-voice-input.umd.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "react",
+    "voice input",
+    "speech recognition",
+    "audio recording",
+    "typescript",
+    "shadcn/ui",
+    "tailwind css"
+  ],
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
     "@radix-ui/react-accordion": "^1.2.0",

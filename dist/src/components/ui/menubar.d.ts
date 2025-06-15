@@ -2,7 +2,7 @@ import * as React from "react";
 import * as MenubarPrimitive from "@radix-ui/react-menubar";
 declare const MenubarMenu: {
     (props: MenubarPrimitive.MenubarMenuProps & {
-        __scopeMenubar?: import('@radix-ui/react-context').Scope;
+        __scopeMenubar?: import("@radix-ui/react-context").Scope;
     }): import("react/jsx-runtime").JSX.Element;
     displayName: string;
 };

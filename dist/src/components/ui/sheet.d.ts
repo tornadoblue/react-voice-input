@@ -1,5 +1,5 @@
-import { VariantProps } from 'class-variance-authority';
 import * as SheetPrimitive from "@radix-ui/react-dialog";
+import { type VariantProps } from "class-variance-authority";
 import * as React from "react";
 declare const Sheet: React.FC<SheetPrimitive.DialogProps>;
 declare const SheetTrigger: React.ForwardRefExoticComponent<SheetPrimitive.DialogTriggerProps & React.RefAttributes<HTMLButtonElement>>;
@@ -8,7 +8,7 @@ declare const SheetPortal: React.FC<SheetPrimitive.DialogPortalProps>;
 declare const SheetOverlay: React.ForwardRefExoticComponent<Omit<SheetPrimitive.DialogOverlayProps & React.RefAttributes<HTMLDivElement>, "ref"> & React.RefAttributes<HTMLDivElement>>;
 declare const sheetVariants: (props?: ({
     side?: "top" | "right" | "bottom" | "left" | null | undefined;
-} & import('class-variance-authority/types').ClassProp) | undefined) => string;
+} & import("class-variance-authority/types").ClassProp) | undefined) => string;
 interface SheetContentProps extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>, VariantProps<typeof sheetVariants> {
 }
 declare const SheetContent: React.ForwardRefExoticComponent<SheetContentProps & React.RefAttributes<HTMLDivElement>>;
