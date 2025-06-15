@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 
 interface EditableTextDisplayProps {
   initialText: string;
@@ -7,7 +8,8 @@ interface EditableTextDisplayProps {
   onEditing: () => void;
   isEditing: boolean;
   placeholder?: string;
-  className?: string;
+  className?: string; // For the root div of this component
+  textDisplayClassName?: string; // For styling the Textarea itself
 }
 
 const EditableTextDisplay: React.FC<EditableTextDisplayProps> = ({
@@ -16,44 +18,37 @@ const EditableTextDisplay: React.FC<EditableTextDisplayProps> = ({
   onEditing,
   isEditing,
   placeholder = "Type here...",
-  className,
+  className, // For the root div
+  textDisplayClassName, // For the Textarea
 }) => {
   const [text, setText] = useState(initialText);
  
 
   const handleInputChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-
-    const text = event.target.value
-    setText(text);
-    onTextChange(text)
+    const newText = event.target.value;
+    setText(newText);
+    onTextChange(newText);
     if (!isEditing) {
-        onEditing()
-        //setIsEditing(true); // Start editing on first change
+        onEditing();
     }
   };
 
   useEffect(() => {
-      // Update text if initialText prop changes and not currently editing
-      // This is important if the parent component updates the text (e.g., after speech recognition)
       if (!isEditing) {
         setText(initialText);
       }
     }, [initialText, isEditing]);
   
-
-  
-  // Automatically save if text changes due to prop update while not focused (e.g. speech update)
-  // and also allow manual save.
-  // The onTextChange is the primary way to communicate back.
-
   return (
-    <div className={`flex flex-col space-y-2 ${className}`}>
+    <div className={cn("flex flex-col space-y-2", className)}>
       <Textarea
         value={text}
         onChange={handleInputChange}
-        // onBlur={handleInputChange} // Save when focus is lost
         placeholder={placeholder}
-        className="w-full min-h-[60px] text-base"
+        className={cn(
+          "w-full min-h-[60px] text-lg", // Default text size changed to text-lg
+          textDisplayClassName // Apply custom classes for the textarea
+        )}
         rows={3}
       />
     </div>

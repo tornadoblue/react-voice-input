@@ -74,6 +74,7 @@ function App() {
         placeholder="Start speaking or type your note..."
         silenceTimeout={3000}      // Optional: milliseconds of silence before auto-stopping
         initialSpeechTimeout={5000} // Optional: milliseconds to wait for speech before timing out
+        textDisplayClassName="text-xl font-serif" // Example: Make text area larger and serif
       />
       <h2>My Recordings:</h2>
       <ul>
@@ -103,6 +104,7 @@ The `VoiceInputCapture` component accepts the following props:
 | `showWaveform`         | `boolean`                                                         | `true`                         | Whether to display the audio waveform during recording.                                                    |
 | `showInterimTranscript`| `boolean`                                                         | `true`                         | Whether to display the interim (real-time) speech-to-text transcript.                                      |
 | `customWaveformColor`  | `string`                                                          | `"#3b82f6"` (Tailwind blue-500) | Custom color for the waveform.                                                                             |
+| `textDisplayClassName` | `string`                                                          | `""` (Defaults to `text-lg`)   | Custom Tailwind CSS classes for the text input area. Defaults to `text-lg`.                                |
 | `disabled`             | `boolean`                                                         | `false`                        | If true, disables the recording button and text input.                                                     |
 | `silenceTimeout`       | `number`                                                          | `3000` (ms)                    | Duration of silence (in milliseconds) after speech before recording automatically stops.                   |
 | `initialSpeechTimeout` | `number`                                                          | `5000` (ms)                    | Duration (in milliseconds) to wait for initial speech before the recording times out if no speech is detected. |

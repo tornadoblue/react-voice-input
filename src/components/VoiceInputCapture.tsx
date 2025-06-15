@@ -31,6 +31,7 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
   silenceTimeout = DEFAULT_VIC_SILENCE_TIMEOUT,
   initialSpeechTimeout = DEFAULT_VIC_INITIAL_SPEECH_TIMEOUT,
   showVersionInfo = true, 
+  textDisplayClassName, // Destructure the new prop
 }) => {
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [interimTranscript, setInterimTranscript] = useState<string>("");
@@ -51,9 +52,6 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
 
   const handleFinalTranscriptSegment = useCallback((segment: string) => {
     const newSegment = segment.trim();
-
-    console.log("*** Segment: " + newSegment);
-
     if (!newSegment) return;
     let currentText = accumulatedFinalTranscriptRef.current;
     if (!currentText) {
@@ -67,7 +65,7 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
       accumulatedFinalTranscriptRef.current = currentText + capitalizeFirstLetter(newSegment);
     }
     accumulatedFinalTranscriptRef.current = accumulatedFinalTranscriptRef.current.trim();
-    if (recordingStateRef.current !== "error") { 
+    if (recordingStateRef.current === "recording") { 
       setFinalTranscript(accumulatedFinalTranscriptRef.current);
       setIsEditing(false); 
     }
@@ -146,17 +144,13 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
   }, [onSave]); 
 
   const handleError = useCallback((error: string) => { 
-
-    // silence is golden
-    if (error == 'silence') return;
-
     console.error("VIC: handleError triggered:", error);
     setRecordingState("error");
     setErrorDetails(error); 
-    // setInterimTranscript("");
+    setInterimTranscript("");
     setAudioDataForWaveform(null);
     toast.error(error || "An unknown recording error occurred.", { duration: 5000 });
-    // accumulatedFinalTranscriptRef.current = "";
+    accumulatedFinalTranscriptRef.current = "";
     setIsEditing(false);
   }, []); 
 
@@ -189,12 +183,11 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
   
   useEffect(() => { 
     if (!isRecordingOrListening && !isEditing) {
-      // console.log("VIC: initialText effect. Current finalTranscript:", finalTranscript, "New initialText:", initialText);
-      if (finalTranscript !== initialText) { // Only update if different to avoid potential loops
+      if (finalTranscript !== initialText) { 
          setFinalTranscript(initialText);
       }
     }
-  }, [initialText, finalTranscript, isEditing, recordingState]); // Added finalTranscript, isEditing, recordingState to deps for correctness
+  }, [initialText, finalTranscript, isEditing, recordingState]); 
 
   const isRecordingOrListening = recordingState === "recording" || recordingState === "listening";
 
@@ -223,8 +216,6 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
       console.log("VIC: toggleRecording - starting recording.");
       setErrorDetails(null);
       setRecordingState("listening"); 
-      // Reset accumulated transcript for the new session.
-      // finalTranscript is preserved for the EditableTextDisplay until speech starts updating it.
       accumulatedFinalTranscriptRef.current = ""; 
       try {
         await speechRecorderRef.current.startRecording();
@@ -238,7 +229,6 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
   };
 
   const handleTextChangeFromEditor = (newText: string) => {
-    // console.log("VIC: handleTextChangeFromEditor. New text:", newText, "Current isEditing:", isEditing);
     setFinalTranscript(newText); 
     if (!isEditing) {
       setIsEditing(true); 
@@ -259,13 +249,13 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
     setIsEditing(false);
   };
 
-  const getButtonIcon = () => { /* ... (no changes) ... */ 
+  const getButtonIcon = () => { 
     if (recordingState === "error") return <RotateCcw className="w-4 h-4" />;
     if (isRecordingOrListening) return <StopCircle className="w-4 h-4" />;
     return <Mic className="w-4 h-4" />;
   };
 
-  const getButtonText = () => { /* ... (no changes) ... */ 
+  const getButtonText = () => { 
     if (recordingState === "error") return "Retry";
     if (recordingState === "listening") return "Listening...";
     if (recordingState === "recording") return "Stop Recording";
@@ -289,10 +279,10 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
             initialText={finalTranscript} 
             onTextChange={handleTextChangeFromEditor} 
             placeholder={placeholder}
-            className="w-full"
+            className="w-full" // This className is for the wrapper div in EditableTextDisplay
+            textDisplayClassName={textDisplayClassName} // Pass the new prop for Textarea styling
             isEditing={isEditing} 
             onEditing={() => { 
-              // console.log("VIC: EditableTextDisplay onEditing triggered"); 
               setIsEditing(true); 
             }}
           />

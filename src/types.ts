@@ -12,7 +12,8 @@ export interface VoiceInputCaptureProps {
   disabled?: boolean;
   silenceTimeout?: number;
   initialSpeechTimeout?: number;
-  showVersionInfo?: boolean; // New prop
+  showVersionInfo?: boolean;
+  textDisplayClassName?: string; // New prop for styling the text display area
 }
 
 export type RecordingState = "idle" | "listening" | "recording" | "error";
