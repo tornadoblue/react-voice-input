@@ -32,8 +32,8 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
   initialSpeechTimeout = DEFAULT_VIC_INITIAL_SPEECH_TIMEOUT,
   showVersionInfo = true, 
   textDisplayClassName,
-  interimTranscriptClassName, // Destructure new prop
-  recordButtonClassName, // Destructure new prop
+  interimTranscriptClassName, 
+  recordButtonClassName, 
 }) => {
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [interimTranscript, setInterimTranscript] = useState<string>("");
@@ -75,7 +75,7 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
 
   const handleInterimTranscript = useCallback((transcript: string) => {
     if (showInterimTranscript) {
-      setInterimTranscript(transcript);
+      setInterimTranscript(capitalizeFirstLetter(transcript.trim()));
     }
   }, [showInterimTranscript]);
 
@@ -296,7 +296,7 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
             disabled={disabled && recordingState !== 'error'}
             className={cn(
               "flex-shrink-0 w-full sm:w-auto",
-              recordButtonClassName, // Apply custom button classes
+              recordButtonClassName, 
               recordingState === 'error' ? "bg-yellow-500 hover:bg-yellow-600 text-white" : ""
             )}
             aria-label={getButtonText()}
@@ -319,8 +319,8 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
       )}
       {showInterimTranscript && isRecordingOrListening && interimTranscript && (
         <div className={cn(
-          "p-2 text-sm text-muted-foreground bg-muted/30 rounded-md min-h-[2.5rem] italic",
-          interimTranscriptClassName // Apply custom interim transcript classes
+          "p-2 text-sm text-muted-foreground bg-muted/30 rounded-md min-h-[2.5rem] italic", // Default base styles
+          interimTranscriptClassName // Custom styles passed as prop
         )}>
           Live: {interimTranscript}
         </div>
