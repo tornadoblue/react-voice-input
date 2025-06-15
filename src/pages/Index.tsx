@@ -20,7 +20,8 @@ const LOCAL_STORAGE_KEY = "voiceRecordings";
 const DEFAULT_SILENCE_TIMEOUT_MS = 3000; 
 const DEFAULT_INITIAL_SPEECH_TIMEOUT_MS = 5000; 
 const DEFAULT_WAVEFORM_COLOR = "#3b82f6"; // blue-500
-const DEFAULT_RECORD_BUTTON_STYLE = "bg-white hover:bg-red-50 text-red-600 border-2 border-red-500 dark:bg-gray-950 dark:hover:bg-red-900/20 dark:text-red-500 dark:border-red-700";
+// New default style for the record button: dark red background, white text
+const DEFAULT_RECORD_BUTTON_STYLE = "bg-red-600 hover:bg-red-700 text-white dark:bg-red-700 dark:hover:bg-red-800 dark:text-red-50";
 const DEFAULT_INTERIM_TEXT_STYLE = "text-xl text-blue-700"; 
 const NEW_DEFAULT_PLACEHOLDER = "Press Record button to start the dictation, or type here...";
 
@@ -245,7 +246,7 @@ const Index = () => {
             key={captureKey} 
             onSave={handleSaveNewRecording}
             initialText="" 
-            placeholder={NEW_DEFAULT_PLACEHOLDER} // Use the new default placeholder
+            placeholder={NEW_DEFAULT_PLACEHOLDER} 
             customWaveformColor={waveformColor}
             textDisplayClassName={textStyle}
             interimTranscriptClassName={interimTextStyle}
