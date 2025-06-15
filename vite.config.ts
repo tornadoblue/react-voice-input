@@ -105,24 +105,24 @@ export default defineConfig(() => ({
     }),
   ],
   build: {
-    // lib: { // Temporarily commented out to build the app
-    //   entry: path.resolve(__dirname, "src/index.ts"),
-    //   name: "ReactVoiceInput", // PascalCase of package name
-    //   formats: ["es", "cjs", "umd"],
-    //   fileName: (format) => `react-voice-input.${format}.js`,
-    // },
-    // rollupOptions: { // Temporarily commented out
-    //   external: ['react', 'react-dom', 'lucide-react', 'sonner', '@radix-ui/react-slot'],
-    //   output: {
-    //     globals: {
-    //       react: "React",
-    //       'react-dom': "ReactDOM",
-    //       'lucide-react': "LucideReact",
-    //       'sonner': "Sonner",
-    //       '@radix-ui/react-slot': 'RadixReactSlot'
-    //     },
-    //   },
-    // },
+    lib: { 
+      entry: path.resolve(__dirname, "src/index.ts"),
+      name: "ReactVoiceInput", // PascalCase of package name
+      formats: ["es", "cjs", "umd"],
+      fileName: (format) => `react-voice-input.${format}.js`,
+    },
+    rollupOptions: { 
+      external: ['react', 'react-dom', 'lucide-react', 'sonner', '@radix-ui/react-slot'],
+      output: {
+        globals: {
+          react: "React",
+          'react-dom': "ReactDOM",
+          'lucide-react': "LucideReact",
+          'sonner': "Sonner",
+          '@radix-ui/react-slot': 'RadixReactSlot'
+        },
+      },
+    },
     sourcemap: true, 
   },
   resolve: {

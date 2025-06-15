@@ -1,31 +1,4 @@
 {
-  "name": "react-voice-input",
-  "private": false,
-  "version": "0.2.2",
-  "type": "module",
-  "main": "./dist/react-voice-input.cjs.js",
-  "module": "./dist/react-voice-input.es.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/react-voice-input.es.js",
-      "require": "./dist/react-voice-input.cjs.js",
-      "default": "./dist/react-voice-input.es.js"
-    },
-    "./package.json": "./package.json"
-  },
-  "files": [
-    "dist",
-    "src"
-  ],
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "build:dev": "vite build --mode development",
-    "lint": "eslint .",
-    "preview": "vite preview"
-  },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
     "@radix-ui/react-accordion": "^1.2.0",
@@ -74,13 +47,6 @@
     "vite-plugin-dts": "^4.5.4",
     "zod": "^3.23.8"
   },
-  "peerDependencies": {
-    "@radix-ui/react-slot": "^1.1.0",
-    "lucide-react": "^0.462.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "sonner": "^1.5.0"
-  },
   "devDependencies": {
     "@eslint/js": "^9.9.0",
     "@tailwindcss/typography": "^0.5.15",
@@ -99,17 +65,11 @@
     "typescript-eslint": "^8.0.1",
     "vite": "^6.3.4"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/tornadoblue/react-voice-input.git"
-  },
-  "keywords": [
-    "react",
-    "voice input",
-    "speech recognition",
-    "audio recording",
-    "typescript"
-  ],
-  "author": "tornadoblue",
-  "license": "MIT"
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "build:app": "vite build --config vite.config.app.ts",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview"
+  }
 }
