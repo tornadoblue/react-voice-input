@@ -75,6 +75,8 @@ function App() {
         silenceTimeout={3000}      // Optional: milliseconds of silence before auto-stopping
         initialSpeechTimeout={5000} // Optional: milliseconds to wait for speech before timing out
         textDisplayClassName="text-xl font-serif" // Example: Make text area larger and serif
+        interimTranscriptClassName="text-lg text-purple-600" // Example: Style interim text
+        recordButtonClassName="bg-green-500 hover:bg-green-600 text-white" // Example: Style record button
       />
       <h2>My Recordings:</h2>
       <ul>
@@ -96,19 +98,21 @@ export default App;
 
 The `VoiceInputCapture` component accepts the following props:
 
-| Prop                   | Type                                                              | Default                        | Description                                                                                                |
-| ---------------------- | ----------------------------------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| `onSave`               | `(text: string, audioBlob: Blob \| null, audioUrl: string \| null) => void` | **Required**                   | Callback function triggered when recording stops (due to silence, manual stop, or error with content).     |
-| `initialText`          | `string`                                                          | `""`                           | Initial text to display in the text area.                                                                  |
-| `placeholder`          | `string`                                                          | `"Speak or type here..."`      | Placeholder text for the text area.                                                                        |
-| `showWaveform`         | `boolean`                                                         | `true`                         | Whether to display the audio waveform during recording.                                                    |
-| `showInterimTranscript`| `boolean`                                                         | `true`                         | Whether to display the interim (real-time) speech-to-text transcript.                                      |
-| `customWaveformColor`  | `string`                                                          | `"#3b82f6"` (Tailwind blue-500) | Custom color for the waveform.                                                                             |
-| `textDisplayClassName` | `string`                                                          | `""` (Defaults to `text-lg`)   | Custom Tailwind CSS classes for the text input area. Defaults to `text-lg`.                                |
-| `disabled`             | `boolean`                                                         | `false`                        | If true, disables the recording button and text input.                                                     |
-| `silenceTimeout`       | `number`                                                          | `3000` (ms)                    | Duration of silence (in milliseconds) after speech before recording automatically stops.                   |
-| `initialSpeechTimeout` | `number`                                                          | `5000` (ms)                    | Duration (in milliseconds) to wait for initial speech before the recording times out if no speech is detected. |
-| `showVersionInfo`      | `boolean`                                                         | `true`                         | Whether to display the component's version number.                                                         |
+| Prop                         | Type                                                              | Default                        | Description                                                                                                |
+| ---------------------------- | ----------------------------------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| `onSave`                     | `(text: string, audioBlob: Blob \| null, audioUrl: string \| null) => void` | **Required**                   | Callback function triggered when recording stops (due to silence, manual stop, or error with content).     |
+| `initialText`                | `string`                                                          | `""`                           | Initial text to display in the text area.                                                                  |
+| `placeholder`                | `string`                                                          | `"Speak or type here..."`      | Placeholder text for the text area.                                                                        |
+| `showWaveform`               | `boolean`                                                         | `true`                         | Whether to display the audio waveform during recording.                                                    |
+| `showInterimTranscript`      | `boolean`                                                         | `true`                         | Whether to display the interim (real-time) speech-to-text transcript.                                      |
+| `customWaveformColor`        | `string`                                                          | `"#3b82f6"` (Tailwind blue-500) | Custom color for the waveform.                                                                             |
+| `textDisplayClassName`       | `string`                                                          | `""` (Defaults to `text-lg`)   | Custom Tailwind CSS classes for the main text input area.                                                  |
+| `interimTranscriptClassName` | `string`                                                          | `""` (Defaults to `text-sm italic text-muted-foreground`) | Custom Tailwind CSS classes for the interim transcript display area.                                     |
+| `recordButtonClassName`      | `string`                                                          | `""`                           | Custom Tailwind CSS classes for the main record/stop/retry button.                                         |
+| `disabled`                   | `boolean`                                                         | `false`                        | If true, disables the recording button and text input.                                                     |
+| `silenceTimeout`             | `number`                                                          | `3000` (ms)                    | Duration of silence (in milliseconds) after speech before recording automatically stops.                   |
+| `initialSpeechTimeout`       | `number`                                                          | `5000` (ms)                    | Duration (in milliseconds) to wait for initial speech before the recording times out if no speech is detected. |
+| `showVersionInfo`            | `boolean`                                                         | `true`                         | Whether to display the component's version number.                                                         |
 
 
 ## Contributing

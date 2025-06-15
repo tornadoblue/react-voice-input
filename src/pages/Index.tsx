@@ -17,10 +17,10 @@ interface Recording {
 }
 
 const LOCAL_STORAGE_KEY = "voiceRecordings";
-// Default values from VoiceInputCapture component for initial state
 const DEFAULT_SILENCE_TIMEOUT_MS = 3000; 
 const DEFAULT_INITIAL_SPEECH_TIMEOUT_MS = 5000; 
 const DEFAULT_WAVEFORM_COLOR = "#3b82f6"; // blue-500
+const DEFAULT_RECORD_BUTTON_STYLE = "text-red-500"; // Example: Make record button text red
 
 const Index = () => {
   const [recordings, setRecordings] = useState<Recording[]>([]);
@@ -28,20 +28,43 @@ const Index = () => {
 
   // State for controllable props
   const [waveformColor, setWaveformColor] = useState<string>(DEFAULT_WAVEFORM_COLOR);
-  const [textStyle, setTextStyle] = useState<string>('text-lg'); // Default style in EditableTextDisplay
+  const [textStyle, setTextStyle] = useState<string>('text-lg');
+  const [interimTextStyle, setInterimTextStyle] = useState<string>('text-sm italic'); // Default for interim
+  const [recordButtonStyle, setRecordButtonStyle] = useState<string>(DEFAULT_RECORD_BUTTON_STYLE);
   const [silenceTime, setSilenceTime] = useState<number>(DEFAULT_SILENCE_TIMEOUT_MS);
   const [initialTime, setInitialTime] = useState<number>(DEFAULT_INITIAL_SPEECH_TIMEOUT_MS);
   const [doShowWaveform, setDoShowWaveform] = useState<boolean>(true);
   const [doShowInterim, setDoShowInterim] = useState<boolean>(true);
   const [doShowVersion, setDoShowVersion] = useState<boolean>(true);
 
-  const textStyleOptions = [
+  const sharedTextStyleOptions = [
+    { value: 'text-xs', label: 'X-Small (xs)' },
+    { value: 'text-sm', label: 'Small (sm)' },
+    { value: 'text-base', label: 'Base' },
+    { value: 'text-lg', label: 'Large (lg)' },
+    { value: 'text-xl', label: 'X-Large (xl)' },
+    { value: 'text-2xl', label: '2X-Large (2xl)' },
+    { value: 'font-semibold', label: 'Semibold' },
+    { value: 'italic', label: 'Italic' },
+    { value: 'text-blue-600', label: 'Blue Text' },
+    { value: 'text-green-600', label: 'Green Text' },
+  ];
+  
+  const mainTextStyleOptions = [
     { value: 'text-lg', label: 'Default (lg)' },
     { value: 'text-xl', label: 'Large (xl)' },
     { value: 'text-2xl font-semibold', label: 'X-Large (2xl) Semibold' },
     { value: 'text-lg italic', label: 'Default Italic (lg)' },
     { value: 'text-sm', label: 'Small (sm)' },
   ];
+
+  const interimStyleOptions = [
+    { value: 'text-sm italic', label: 'Default (sm, italic)' },
+    { value: 'text-xs italic text-gray-500', label: 'X-Small, Italic, Gray' },
+    { value: 'text-base font-medium', label: 'Base, Medium Weight' },
+    { value: 'text-lg text-blue-500', label: 'Large, Blue' },
+  ];
+
 
   useEffect(() => {
     try {
@@ -109,7 +132,6 @@ const Index = () => {
         </p>
       </header>
 
-      {/* Settings Card */}
       <Card className="w-full max-w-2xl mx-auto">
         <CardHeader>
           <CardTitle className="flex items-center"><Settings className="w-5 h-5 mr-2" /> Component Settings</CardTitle>
@@ -127,17 +149,42 @@ const Index = () => {
               />
             </div>
             <div>
-              <Label htmlFor="textStyle">Text Area Style</Label>
+              <Label htmlFor="textStyle">Main Text Style</Label>
               <Select onValueChange={setTextStyle} defaultValue={textStyle}>
                 <SelectTrigger id="textStyle">
                   <SelectValue placeholder="Select style" />
                 </SelectTrigger>
                 <SelectContent>
-                  {textStyleOptions.map(opt => (
+                  {mainTextStyleOptions.map(opt => (
                     <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+            <div>
+              <Label htmlFor="interimTextStyle">Interim Text Style</Label>
+              <Select onValueChange={setInterimTextStyle} defaultValue={interimTextStyle}>
+                <SelectTrigger id="interimTextStyle">
+                  <SelectValue placeholder="Select style" />
+                </SelectTrigger>
+                <SelectContent>
+                  {interimStyleOptions.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="recordButtonStyle">Record Button Style (Tailwind)</Label>
+              <Input 
+                id="recordButtonStyle" 
+                value={recordButtonStyle} 
+                onChange={(e) => setRecordButtonStyle(e.target.value)} 
+                placeholder="e.g., text-red-500 bg-blue-100"
+              />
             </div>
           </div>
 
@@ -183,7 +230,6 @@ const Index = () => {
         </CardContent>
       </Card>
 
-      {/* Voice Input Card */}
       <Card className="w-full max-w-2xl mx-auto">
         <CardHeader>
           <CardTitle>New Entry</CardTitle>
@@ -197,9 +243,10 @@ const Index = () => {
             onSave={handleSaveNewRecording}
             initialText="" 
             placeholder="Start speaking or type your entry..."
-            // Pass controllable props
             customWaveformColor={waveformColor}
             textDisplayClassName={textStyle}
+            interimTranscriptClassName={interimTextStyle}
+            recordButtonClassName={recordButtonStyle}
             silenceTimeout={silenceTime}
             initialSpeechTimeout={initialTime}
             showWaveform={doShowWaveform}
@@ -209,7 +256,6 @@ const Index = () => {
         </CardContent>
       </Card>
 
-      {/* Recordings List Card */}
       {recordings.length > 0 && (
         <Card className="w-full max-w-2xl mx-auto">
           <CardHeader className="flex flex-row items-center justify-between">

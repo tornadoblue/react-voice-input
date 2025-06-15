@@ -31,7 +31,9 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
   silenceTimeout = DEFAULT_VIC_SILENCE_TIMEOUT,
   initialSpeechTimeout = DEFAULT_VIC_INITIAL_SPEECH_TIMEOUT,
   showVersionInfo = true, 
-  textDisplayClassName, // Destructure the new prop
+  textDisplayClassName,
+  interimTranscriptClassName, // Destructure new prop
+  recordButtonClassName, // Destructure new prop
 }) => {
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [interimTranscript, setInterimTranscript] = useState<string>("");
@@ -136,7 +138,7 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
       onSave(textFromSpeechSession, processedAudioBlob, processedAudioUrl);
     } else {
       if (!commandDetected) {
-        // setFinalTranscript(""); // Consider if initialText should be restored if nothing was captured
+        // setFinalTranscript(""); 
       }
       console.log("VIC: handleRecordingStop, NOT calling onSave (no text/audio).");
     }
@@ -155,7 +157,6 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
   }, []); 
 
   const handleAudioData = useCallback((dataArray: Uint8Array) => { 
-    // console.log("VIC: handleAudioData received. Data length:", dataArray?.length); // Can be very noisy
     if (showWaveform) {
       setAudioDataForWaveform(new Uint8Array(dataArray));
     }
@@ -279,8 +280,8 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
             initialText={finalTranscript} 
             onTextChange={handleTextChangeFromEditor} 
             placeholder={placeholder}
-            className="w-full" // This className is for the wrapper div in EditableTextDisplay
-            textDisplayClassName={textDisplayClassName} // Pass the new prop for Textarea styling
+            className="w-full"
+            textDisplayClassName={textDisplayClassName}
             isEditing={isEditing} 
             onEditing={() => { 
               setIsEditing(true); 
@@ -291,14 +292,18 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
 
        <div className="flex flex-row items-center justify-between">
           <Button 
-          onClick={recordingState === 'error' ? handleRetryError : toggleRecording} 
-          disabled={disabled && recordingState !== 'error'}
-          className={cn("flex-shrink-0 w-full sm:w-auto", recordingState === 'error' ? "bg-yellow-500 hover:bg-yellow-600 text-white" : "")}
-          aria-label={getButtonText()}
-        >
-          {getButtonIcon()}
-          <span className="ml-2">{getButtonText()}</span>
-        </Button>
+            onClick={recordingState === 'error' ? handleRetryError : toggleRecording} 
+            disabled={disabled && recordingState !== 'error'}
+            className={cn(
+              "flex-shrink-0 w-full sm:w-auto",
+              recordButtonClassName, // Apply custom button classes
+              recordingState === 'error' ? "bg-yellow-500 hover:bg-yellow-600 text-white" : ""
+            )}
+            aria-label={getButtonText()}
+          >
+            {getButtonIcon()}
+            <span className="ml-2">{getButtonText()}</span>
+          </Button>
 
         {isEditing && ( 
          <Button onClick={handleManualSave} className="flex-shrink-0 w-full sm:w-auto">
@@ -313,7 +318,10 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
         </div>
       )}
       {showInterimTranscript && isRecordingOrListening && interimTranscript && (
-        <div className="p-2 text-sm text-muted-foreground bg-muted/30 rounded-md min-h-[2.5rem] italic">
+        <div className={cn(
+          "p-2 text-sm text-muted-foreground bg-muted/30 rounded-md min-h-[2.5rem] italic",
+          interimTranscriptClassName // Apply custom interim transcript classes
+        )}>
           Live: {interimTranscript}
         </div>
       )}
