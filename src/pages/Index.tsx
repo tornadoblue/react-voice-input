@@ -20,7 +20,6 @@ const LOCAL_STORAGE_KEY = "voiceRecordings";
 const DEFAULT_SILENCE_TIMEOUT_MS = 3000; 
 const DEFAULT_INITIAL_SPEECH_TIMEOUT_MS = 5000; 
 const DEFAULT_WAVEFORM_COLOR = "#3b82f6"; // blue-500
-// New default style for the record button: dark red background, white text
 const DEFAULT_RECORD_BUTTON_STYLE = "bg-red-600 hover:bg-red-700 text-white dark:bg-red-700 dark:hover:bg-red-800 dark:text-red-50";
 const DEFAULT_INTERIM_TEXT_STYLE = "text-xl text-blue-700"; 
 const NEW_DEFAULT_PLACEHOLDER = "Press Record button to start the dictation, or type here...";
@@ -40,18 +39,7 @@ const Index = () => {
   const [doShowInterim, setDoShowInterim] = useState<boolean>(true);
   const [doShowVersion, setDoShowVersion] = useState<boolean>(true);
 
-  const sharedTextStyleOptions = [
-    { value: 'text-xs', label: 'X-Small (xs)' },
-    { value: 'text-sm', label: 'Small (sm)' },
-    { value: 'text-base', label: 'Base' },
-    { value: 'text-lg', label: 'Large (lg)' },
-    { value: 'text-xl', label: 'X-Large (xl)' },
-    { value: 'text-2xl', label: '2X-Large (2xl)' },
-    { value: 'font-semibold', label: 'Semibold' },
-    { value: 'italic', label: 'Italic' },
-    { value: 'text-blue-600', label: 'Blue Text' },
-    { value: 'text-green-600', label: 'Green Text' },
-  ];
+  // Removed unused sharedTextStyleOptions
   
   const mainTextStyleOptions = [
     { value: 'text-lg', label: 'Default (lg)' },

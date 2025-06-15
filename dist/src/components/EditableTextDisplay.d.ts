@@ -1,4 +1,4 @@
-import { default as React } from 'react';
+import React from 'react';
 interface EditableTextDisplayProps {
     initialText: string;
     onTextChange: (newText: string) => void;
@@ -6,6 +6,7 @@ interface EditableTextDisplayProps {
     isEditing: boolean;
     placeholder?: string;
     className?: string;
+    textDisplayClassName?: string;
 }
 declare const EditableTextDisplay: React.FC<EditableTextDisplayProps>;
 export default EditableTextDisplay;

@@ -1,4 +1,4 @@
-import { default as React } from 'react';
+import React from 'react';
 interface WaveformDisplayProps {
     audioData: Uint8Array | null;
     color?: string;
