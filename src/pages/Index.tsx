@@ -20,7 +20,8 @@ const LOCAL_STORAGE_KEY = "voiceRecordings";
 const DEFAULT_SILENCE_TIMEOUT_MS = 3000; 
 const DEFAULT_INITIAL_SPEECH_TIMEOUT_MS = 5000; 
 const DEFAULT_WAVEFORM_COLOR = "#3b82f6"; // blue-500
-const DEFAULT_RECORD_BUTTON_STYLE = "text-red-500"; // Example: Make record button text red
+// Updated default style for the record button for better readability
+const DEFAULT_RECORD_BUTTON_STYLE = "bg-white hover:bg-red-50 text-red-600 border border-red-500 dark:bg-gray-950 dark:hover:bg-red-900/20 dark:text-red-500 dark:border-red-700";
 
 const Index = () => {
   const [recordings, setRecordings] = useState<Recording[]>([]);
@@ -29,7 +30,7 @@ const Index = () => {
   // State for controllable props
   const [waveformColor, setWaveformColor] = useState<string>(DEFAULT_WAVEFORM_COLOR);
   const [textStyle, setTextStyle] = useState<string>('text-lg');
-  const [interimTextStyle, setInterimTextStyle] = useState<string>('text-sm italic'); // Default for interim
+  const [interimTextStyle, setInterimTextStyle] = useState<string>('text-sm italic'); 
   const [recordButtonStyle, setRecordButtonStyle] = useState<string>(DEFAULT_RECORD_BUTTON_STYLE);
   const [silenceTime, setSilenceTime] = useState<number>(DEFAULT_SILENCE_TIMEOUT_MS);
   const [initialTime, setInitialTime] = useState<number>(DEFAULT_INITIAL_SPEECH_TIMEOUT_MS);
