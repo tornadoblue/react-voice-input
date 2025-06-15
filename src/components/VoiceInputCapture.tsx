@@ -51,6 +51,9 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
 
   const handleFinalTranscriptSegment = useCallback((segment: string) => {
     const newSegment = segment.trim();
+
+    console.log("*** Segment: " + newSegment);
+
     if (!newSegment) return;
     let currentText = accumulatedFinalTranscriptRef.current;
     if (!currentText) {
@@ -64,7 +67,7 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
       accumulatedFinalTranscriptRef.current = currentText + capitalizeFirstLetter(newSegment);
     }
     accumulatedFinalTranscriptRef.current = accumulatedFinalTranscriptRef.current.trim();
-    if (recordingStateRef.current === "recording") { 
+    if (recordingStateRef.current !== "error") { 
       setFinalTranscript(accumulatedFinalTranscriptRef.current);
       setIsEditing(false); 
     }
@@ -143,13 +146,17 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
   }, [onSave]); 
 
   const handleError = useCallback((error: string) => { 
+
+    // silence is golden
+    if (error == 'silence') return;
+
     console.error("VIC: handleError triggered:", error);
     setRecordingState("error");
     setErrorDetails(error); 
-    setInterimTranscript("");
+    // setInterimTranscript("");
     setAudioDataForWaveform(null);
     toast.error(error || "An unknown recording error occurred.", { duration: 5000 });
-    accumulatedFinalTranscriptRef.current = "";
+    // accumulatedFinalTranscriptRef.current = "";
     setIsEditing(false);
   }, []); 
 

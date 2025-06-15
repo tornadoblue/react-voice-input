@@ -36,6 +36,9 @@ class EnhancedSpeechRecorder {
   private recognitionServiceTrulyActive: boolean = false; 
 
   private options: EnhancedSpeechRecorderOptions;
+  private finalText: string = ''
+  private interimText: string = ''
+
 
   constructor(options: EnhancedSpeechRecorderOptions) {
     this.options = {
@@ -67,8 +70,14 @@ class EnhancedSpeechRecorder {
           const part = event.results[i][0].transcript;
           if (event.results[i].isFinal) { final += part; } else { interim += part; }
         }
-        if (final) this.options.onFinalTranscript(final.trim());
-        if (interim) this.options.onInterimTranscript(interim.trim());
+        if (final) {
+          this.finalText = final.trim()
+          this.options.onFinalTranscript(this.finalText);
+        } 
+        if (interim) {
+          this.interimText = interim.trim()
+          this.options.onInterimTranscript(this.interimText);
+        } 
       };
       this.speechRecognition.onerror = (event: any) => { 
         const oldActive = this.recognitionServiceTrulyActive; this.recognitionServiceTrulyActive = false; 
@@ -101,6 +110,7 @@ class EnhancedSpeechRecorder {
       if (!this.hasDetectedSpeech && this.recognitionServiceTrulyActive) { 
         this.options.onError("No speech detected."); this.stopReason = 'initial_timeout';
         this.stopRecordingInternal('initial_timeout');
+        
       }
     }, timeout);
   }
@@ -112,8 +122,20 @@ class EnhancedSpeechRecorder {
       if (typeof timeout !== 'number' || timeout <= 0) return;
       this.silenceTimeoutId = setTimeout(() => {
         if (this.recognitionServiceTrulyActive) { 
-          this.options.onError("Silence detected, stopping."); this.stopReason = 'silence';
-          this.stopRecordingInternal('silence');
+
+          const noRecordedText = !this.finalText && !this.interimText;
+
+          if (!noRecordedText) {
+              // this.options.onError("Silence detected, stopping."); 
+              this.stopReason = 'silence';
+              this.stopRecordingInternal('silence');
+          }
+          else {
+            if (this.finalText) this.options.onFinalTranscript(this.finalText);
+            if (this.interimText) this.options.onInterimTranscript(this.interimText);
+            this.stopRecordingInternal('manual');
+          }
+          //this.stopRecordingInternal('silence');
         }
       }, timeout);
     }
@@ -187,7 +209,7 @@ class EnhancedSpeechRecorder {
     if (this.audioContext && this.audioContext.state !== 'closed') {
         if (this.sourceNode) { try { this.sourceNode.disconnect(); } catch(_e) {} } // Changed e to _e if you want to be consistent, though not strictly necessary for an empty catch
     }
-    this.sourceNode = null; this.analyserNode = null; 
+    this.sourceNode = null; this.analyserNode = null;  
     if (this.audioContext && this.audioContext.state !== 'closed') { this.audioContext.close().catch(_e => {}); } // Changed e to _e
     this.audioContext = null; this.dataArray = null;
   };

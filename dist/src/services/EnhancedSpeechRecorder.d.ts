@@ -27,6 +27,8 @@ declare class EnhancedSpeechRecorder {
     private stopReason;
     private recognitionServiceTrulyActive;
     private options;
+    private finalText;
+    private interimText;
     constructor(options: EnhancedSpeechRecorderOptions);
     private initializeSpeechRecognition;
     private startInitialSpeechTimer;
