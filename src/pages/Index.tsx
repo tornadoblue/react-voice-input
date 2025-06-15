@@ -1,4 +1,4 @@
-import { VoiceInputCapture, VoiceInputCaptureProps } from "react-voice-input"; // Updated import
+import { VoiceInputCapture, VoiceInputCaptureProps } from "react-voice-input"; 
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,7 +34,7 @@ const Index = () => {
   }, [recordings]);
 
   const handleSaveNewRecording: VoiceInputCaptureProps['onSave'] = (finalText, audioBlob, audioUrl) => {
-    console.log("Index: Saving new recording. Text:", finalText, "Audio URL:", audioUrl, "Blob exists:", !!audioBlob);
+    console.log("Index: handleSaveNewRecording called. Text:", finalText, "Audio URL:", audioUrl, "Blob exists:", !!audioBlob);
     
     if (!finalText.trim() && !audioBlob) { 
       console.log("Index: Attempted to save empty recording (no text, no audio). Skipping.");
@@ -102,7 +102,8 @@ const Index = () => {
             silenceTimeout={SILENCE_TIMEOUT_MS}
             initialSpeechTimeout={INITIAL_SPEECH_TIMEOUT_MS}
             showWaveform={true}
-            showInterimTranscript={true}
+            showInterimTranscript={true} // This controls the separate interim display
+            showVersionInfo={true} // Assuming you want to keep this
           />
         </CardContent>
       </Card>

@@ -106,6 +106,8 @@ The `VoiceInputCapture` component accepts the following props:
 | `disabled`             | `boolean`                                                         | `false`                        | If true, disables the recording button and text input.                                                     |
 | `silenceTimeout`       | `number`                                                          | `3000` (ms)                    | Duration of silence (in milliseconds) after speech before recording automatically stops.                   |
 | `initialSpeechTimeout` | `number`                                                          | `5000` (ms)                    | Duration (in milliseconds) to wait for initial speech before the recording times out if no speech is detected. |
+| `showVersionInfo`      | `boolean`                                                         | `true`                         | Whether to display the component's version number.                                                         |
+
 
 ## Contributing
 
