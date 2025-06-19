@@ -1,4 +1,4 @@
-import React from 'react';
+import { default as React } from 'react';
 interface EditableTextDisplayProps {
     initialText: string;
     onTextChange: (newText: string) => void;

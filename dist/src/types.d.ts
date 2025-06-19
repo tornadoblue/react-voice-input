@@ -12,6 +12,7 @@ export interface VoiceInputCaptureProps {
     textDisplayClassName?: string;
     interimTranscriptClassName?: string;
     recordButtonClassName?: string;
+    className?: string;
 }
 export type RecordingState = "idle" | "listening" | "recording" | "error";
 //# sourceMappingURL=types.d.ts.map

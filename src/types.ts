@@ -16,6 +16,7 @@ export interface VoiceInputCaptureProps {
   textDisplayClassName?: string;
   interimTranscriptClassName?: string; // New prop for styling the interim transcript
   recordButtonClassName?: string; // New prop for styling the record button
+  className?: string;
 }
 
 export type RecordingState = "idle" | "listening" | "recording" | "error";

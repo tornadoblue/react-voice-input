@@ -34,6 +34,7 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
   textDisplayClassName,
   interimTranscriptClassName, 
   recordButtonClassName, 
+  className = "w-full max-w-2xl"
 }) => {
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [interimTranscript, setInterimTranscript] = useState<string>("");
@@ -266,7 +267,8 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
   const componentVersion = packageJson.version;
 
   return ( 
-    <div className={cn("relative p-3 sm:p-4 border rounded-lg shadow-sm bg-card w-full max-w-2xl mx-auto space-y-3", { "opacity-75 cursor-not-allowed": disabled })}>
+    <div className={className}>
+    <div className={cn("relative p-3 sm:p-4 border rounded-lg shadow-sm bg-card mx-auto space-y-3", { "opacity-75 cursor-not-allowed": disabled })}>
       {showVersionInfo && componentVersion && (
         <div className="absolute top-2 right-2 flex items-center space-x-1 text-xs text-muted-foreground">
           <Info className="w-3 h-3" />
@@ -332,5 +334,6 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
          <WaveformDisplay audioData={null} color={customWaveformColor} className="w-full h-16" />
       )}
     </div>
+  </div>
   );
 };
