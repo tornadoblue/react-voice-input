@@ -27,7 +27,7 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
   showWaveform = true,
   showInterimTranscript = true,
   customWaveformColor,
-  placeholder = "Press Record button to start the dictation, or type here...", // Updated default placeholder
+  placeholder = "Press Record button to start the dictation, or type here...",
   disabled = false,
   silenceTimeout = DEFAULT_VIC_SILENCE_TIMEOUT,
   initialSpeechTimeout = DEFAULT_VIC_INITIAL_SPEECH_TIMEOUT,
@@ -54,6 +54,8 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
   useEffect(() => {
     recordingStateRef.current = recordingState;
   }, [recordingState]);
+
+  const isRecordingOrListening = recordingState === "recording" || recordingState === "listening";
 
   const handleFinalTranscriptSegment = useCallback((segment: string) => {
     const newSegment = segment.trim();
@@ -216,10 +218,8 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
       console.log("VIC: Auto-starting recording due to autoStartRecording prop");
       hasAutoStartedRef.current = true;
       // Small delay to ensure the recorder is fully initialized
-      const timer = setTimeout(() => {
-        startRecording();
-      }, 100);
       
+      const timer = setTimeout(startRecording, 100);
       return () => clearTimeout(timer);
     }
   }, [autoStartRecording, disabled, startRecording]);
@@ -230,9 +230,7 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
          setFinalTranscript(initialText);
       }
     }
-  }, [initialText, finalTranscript, isEditing, recordingState]); 
-
-  const isRecordingOrListening = recordingState === "recording" || recordingState === "listening";
+  }, [initialText, finalTranscript, isEditing, isRecordingOrListening]); 
 
   useEffect(() => { 
     const urlToRevoke = currentAudioUrl;
@@ -270,7 +268,7 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
   const handleManualSave = () => { 
     console.log("VIC: handleManualSave, calling onSave with:", { text: finalTranscript, blob: !!currentAudioBlob, url: currentAudioUrl });
     onSave(finalTranscript, currentAudioBlob, currentAudioUrl); 
-    toast.success("Text saved manually!");
+     toast.success("Text saved manually!");
     setIsEditing(false); 
   };
 
@@ -298,31 +296,31 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
 
   return ( 
     <div className={className}>
-    <div className={cn("relative p-3 sm:p-4 border rounded-lg shadow-sm bg-card mx-auto space-y-3", { "opacity-75 cursor-not-allowed": disabled })}>
-      {showVersionInfo && componentVersion && (
-        <div className="absolute top-2 right-2 flex items-center space-x-1 text-xs text-muted-foreground">
-          <Info className="w-3 h-3" />
-          <span>v{componentVersion}</span>
-        </div>
-      )}
+      <div className={cn("relative p-3 sm:p-4 border rounded-lg shadow-sm bg-card mx-auto space-y-3", { "opacity-75 cursor-not-allowed": disabled })}>
+        {showVersionInfo && componentVersion && (
+          <div className="absolute top-2 right-2 flex items-center space-x-1 text-xs text-muted-foreground">
+            <Info className="w-3 h-3" />
+            <span>v{componentVersion}</span>
+          </div>
+        )}
 
-      <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 pt-4">
-        <div className="flex-grow w-full">
-          <EditableTextDisplay
-            initialText={finalTranscript} 
-            onTextChange={handleTextChangeFromEditor} 
-            placeholder={placeholder}
-            className="w-full"
-            textDisplayClassName={textDisplayClassName}
-            isEditing={isEditing} 
-            onEditing={() => { 
-              setIsEditing(true); 
-            }}
-          />
+        <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 pt-4">
+          <div className="flex-grow w-full">
+            <EditableTextDisplay
+              initialText={finalTranscript} 
+              onTextChange={handleTextChangeFromEditor} 
+              placeholder={placeholder}
+              className="w-full"
+              textDisplayClassName={textDisplayClassName}
+              isEditing={isEditing} 
+              onEditing={() => { 
+                setIsEditing(true); 
+              }}
+            />
+          </div>
         </div>
-      </div>
 
-       <div className="flex flex-row items-center justify-between">
+        <div className="flex flex-row items-center justify-between">
           <Button 
             onClick={recordingState === 'error' ? handleRetryError : toggleRecording} 
             disabled={disabled && recordingState !== 'error'}
@@ -337,33 +335,38 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
             <span className="ml-2">{getButtonText()}</span>
           </Button>
 
-        {isEditing && ( 
-         <Button onClick={handleManualSave} className="flex-shrink-0 w-full sm:w-auto">
-            <Save className="w-4 h-4 mr-2" />
-            Save Text
-        </Button>)}
+          {isEditing && ( 
+            <Button onClick={handleManualSave} className="flex-shrink-0 w-full sm:w-auto">
+              <Save className="w-4 h-4 mr-2" />
+              Save Text
+            </Button>
+          )}
         </div>
       
-      {recordingState === "error" && errorDetails && (
-        <div className="flex items-center p-2 text-sm text-destructive-foreground bg-destructive rounded-md">
-          <AlertTriangle className="w-4 h-4 mr-2 flex-shrink-0" /> <span>Error: {errorDetails}</span>
-        </div>
-      )}
-      {showInterimTranscript && isRecordingOrListening && interimTranscript && (
-        <div className={cn(
-          "p-2 text-sm text-muted-foreground bg-muted/30 rounded-md min-h-[2.5rem] italic", // Default base styles
-          interimTranscriptClassName // Custom styles passed as prop
-        )}>
-          Live: {interimTranscript}
-        </div>
-      )}
-      {showWaveform && isRecordingOrListening && (
-         <WaveformDisplay audioData={audioDataForWaveform} color={customWaveformColor} className="w-full h-16" />
-      )}
-      {showWaveform && recordingState === "idle" && !errorDetails && ( 
-         <WaveformDisplay audioData={null} color={customWaveformColor} className="w-full h-16" />
-      )}
+        {recordingState === "error" && errorDetails && (
+          <div className="flex items-center p-2 text-sm text-destructive-foreground bg-destructive rounded-md">
+            <AlertTriangle className="w-4 h-4 mr-2 flex-shrink-0" /> 
+            <span>Error: {errorDetails}</span>
+          </div>
+        )}
+        
+        {showInterimTranscript && isRecordingOrListening && interimTranscript && (
+          <div className={cn(
+            "p-2 text-sm text-muted-foreground bg-muted/30 rounded-md min-h-[2.5rem] italic",
+            interimTranscriptClassName
+          )}>
+            Live: {interimTranscript}
+          </div>
+        )}
+        
+        {showWaveform && isRecordingOrListening && (
+          <WaveformDisplay audioData={audioDataForWaveform} color={customWaveformColor} className="w-full h-16" />
+        )}
+        
+        {showWaveform && recordingState === "idle" && !errorDetails && ( 
+          <WaveformDisplay audioData={null} color={customWaveformColor} className="w-full h-16" />
+        )}
+      </div>
     </div>
-  </div>
   );
 };
