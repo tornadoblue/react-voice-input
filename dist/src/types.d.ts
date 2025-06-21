@@ -1,6 +1,7 @@
 export interface VoiceInputCaptureProps {
     onSave: (text: string, audioBlob: Blob | null, audioUrl: string | null) => void;
     initialText?: string;
+    autoStartRecording?: boolean;
     showWaveform?: boolean;
     showInterimTranscript?: boolean;
     customWaveformColor?: string;

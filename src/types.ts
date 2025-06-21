@@ -5,6 +5,7 @@ export interface VoiceInputCaptureProps {
     audioUrl: string | null
   ) => void;
   initialText?: string;
+  autoStartRecording?: boolean;
   showWaveform?: boolean;
   showInterimTranscript?: boolean;
   customWaveformColor?: string;

@@ -23,7 +23,6 @@ const capitalizeFirstLetter = (str: string): string => {
 export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
   onSave,
   initialText = "",
-  autoStartRecording = false,
   showWaveform = true,
   showInterimTranscript = true,
   customWaveformColor,
@@ -48,7 +47,6 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
   
   const speechRecorderRef = useRef<EnhancedSpeechRecorder | null>(null);
   const accumulatedFinalTranscriptRef = useRef<string>("");
-  const hasAutoStartedRef = useRef<boolean>(false);
 
   const recordingStateRef = useRef(recordingState);
   useEffect(() => {
@@ -165,31 +163,6 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
     }
   }, [showWaveform]);
 
-  const startRecording = useCallback(async () => {
-    console.log("VIC: startRecording called. Current state:", recordingStateRef.current, "Disabled:", disabled);
-    if (disabled) return;
-    if (!speechRecorderRef.current) {
-      toast.error("Recorder not ready. Please try again.");
-      console.error("VIC: startRecording - speechRecorderRef is null!");
-      return;
-    }
-
-    if (recordingStateRef.current !== "idle") return;
-
-    console.log("VIC: startRecording - starting recording.");
-    setErrorDetails(null);
-    setRecordingState("listening"); 
-    accumulatedFinalTranscriptRef.current = ""; 
-    try {
-      await speechRecorderRef.current.startRecording();
-      console.log("VIC: startRecording - startRecording promise resolved.");
-    } catch (e) {
-      console.error("VIC: startRecording - error calling startRecording:", e);
-      handleError((e as Error).message || "Failed to start recording.");
-      setRecordingState("idle"); 
-    }
-  }, [disabled, handleError]);
-
   useEffect(() => { 
     console.log("VIC: Initializing EnhancedSpeechRecorder with timeouts:", {silenceTimeout, initialSpeechTimeout});
     const recorder = new EnhancedSpeechRecorder({
@@ -210,20 +183,6 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
     };
   }, [handleFinalTranscriptSegment, handleInterimTranscript, handleRecordingStart, handleRecordingStop, handleError, handleAudioData, silenceTimeout, initialSpeechTimeout]);
   
-  // Auto-start recording effect
-  useEffect(() => {
-    if (autoStartRecording && !disabled && !hasAutoStartedRef.current && speechRecorderRef.current) {
-      console.log("VIC: Auto-starting recording due to autoStartRecording prop");
-      hasAutoStartedRef.current = true;
-      // Small delay to ensure the recorder is fully initialized
-      const timer = setTimeout(() => {
-        startRecording();
-      }, 100);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [autoStartRecording, disabled, startRecording]);
-
   useEffect(() => { 
     if (!isRecordingOrListening && !isEditing) {
       if (finalTranscript !== initialText) { 
@@ -256,7 +215,18 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
       console.log("VIC: toggleRecording - stopping recording.");
       speechRecorderRef.current.stopRecording('manual');
     } else {
-      await startRecording();
+      console.log("VIC: toggleRecording - starting recording.");
+      setErrorDetails(null);
+      setRecordingState("listening"); 
+      accumulatedFinalTranscriptRef.current = ""; 
+      try {
+        await speechRecorderRef.current.startRecording();
+        console.log("VIC: toggleRecording - startRecording promise resolved.");
+      } catch (e) {
+        console.error("VIC: toggleRecording - error calling startRecording:", e);
+        handleError((e as Error).message || "Failed to start recording.");
+        setRecordingState("idle"); 
+      }
     }
   };
 
@@ -281,7 +251,7 @@ export const VoiceInputCapture: React.FC<VoiceInputCaptureProps> = ({
     setIsEditing(false);
   };
 
-    const getButtonIcon = () => { 
+  const getButtonIcon = () => { 
     if (recordingState === "error") return <RotateCcw className="w-4 h-4" />;
     if (isRecordingOrListening) return <StopCircle className="w-4 h-4" />;
     return <Mic className="w-4 h-4" />;
