@@ -1,6 +1,6 @@
 {
   "name": "react-voice-input",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "A reusable React voice input component for capturing audio and transcribing speech.",
   "main": "./dist/react-voice-input.umd.js",
   "module": "./dist/react-voice-input.es.js",

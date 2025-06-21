@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { VoiceInputCapture, VoiceInputCaptureProps } from '../components/VoiceInputCapture';
+import { VoiceInputCapture } from '../components/VoiceInputCapture';
+import { VoiceInputCaptureProps } from '../types';
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

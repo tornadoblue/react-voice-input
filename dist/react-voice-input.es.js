@@ -3288,7 +3288,7 @@ function qt(r) {
       d = Math.max(-1, Math.min(1, a[A][g])), s.setInt16(f, d * 32767, !0), f += 2;
   return console.log("AudioUtils: Encoded AudioBuffer to WAV Blob."), new Blob([s], { type: "audio/wav" });
 }
-const Jt = "0.2.3", Kt = {
+const Jt = "0.2.5", Kt = {
   version: Jt
 }, vr = "stop recording", yr = 0.75, Xt = 3e3, Ht = 5e3, Je = (r) => r ? r.charAt(0).toUpperCase() + r.slice(1) : "", oo = ({
   onSave: r,
